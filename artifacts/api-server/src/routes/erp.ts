@@ -2003,8 +2003,11 @@ router.get("/erp/purchase-orders", authenticate, requireStaff, requireStore, req
     const limitNum = Math.min(500, Math.max(1, parseInt(limit) || 10));
     const offset   = (pageNum - 1) * limitNum;
 
-    const baseWhere = status
-      ? and(eq(schema.purchaseOrdersTable.storeId, storeId), eq(schema.purchaseOrdersTable.status, status))
+    const statusValue = status === "pending" || status === "received" || status === "cancelled"
+      ? status
+      : undefined;
+    const baseWhere = statusValue
+      ? and(eq(schema.purchaseOrdersTable.storeId, storeId), eq(schema.purchaseOrdersTable.status, statusValue))
       : eq(schema.purchaseOrdersTable.storeId, storeId);
 
     const [{ count }] = await db
@@ -3028,13 +3031,13 @@ router.post("/erp/transactions", authenticate, requireStaff, requireStore, requi
           caisseId: staffCaisse.id,
           type: "debit",
           amount: amount.toFixed(2),
-          reason: "expense",
+          reason: "adjustment",
           actorUserId,
           notes: body.description || body.category || "Charge",
           balanceBefore: oldBalance.toFixed(2),
           balanceAfter: newBalance.toFixed(2),
         });
-        broadcastCaisseChanged(storeId, staffCaisse.id);
+        await broadcastCaisseChanged(storeId, [staffCaisse.id]);
       }
 
       return transaction;
@@ -5651,7 +5654,7 @@ router.get("/erp/alerts/slow-movers", authenticate, requireStaff, requireStore, 
 router.get("/erp/products/:id/expiry-batches", authenticate, requireStaff, requireStore, requirePermission("products", "view"), async (req: AuthRequest, res) => {
   try {
     const storeId = req.currentStoreId!;
-    const productId = parseInt(req.params.id!, 10);
+    const productId = pid(req, "id");
     if (isNaN(productId)) return res.status(400).json({ error: "Invalid product id" });
 
     const rows = await db.execute(sql`
@@ -5660,15 +5663,15 @@ router.get("/erp/products/:id/expiry-batches", authenticate, requireStaff, requi
       WHERE product_id = ${productId} AND store_id = ${storeId}
       ORDER BY expiry_date ASC
     `);
-    res.json(rows.rows);
-  } catch (err) { req.log.error(err); res.status(500).json({ error: "Internal server error" }); }
+    return res.json(rows.rows);
+  } catch (err) { req.log.error(err); return res.status(500).json({ error: "Internal server error" }); }
 });
 
 // POST /erp/products/:id/expiry-batches — add a new batch
 router.post("/erp/products/:id/expiry-batches", authenticate, requireStaff, requireStore, requirePermission("products", "edit"), async (req: AuthRequest, res) => {
   try {
     const storeId = req.currentStoreId!;
-    const productId = parseInt(req.params.id!, 10);
+    const productId = pid(req, "id");
     if (isNaN(productId)) return res.status(400).json({ error: "Invalid product id" });
 
     const { quantity, expiryDate, lotNumber, notes } = req.body as {
@@ -5690,15 +5693,15 @@ router.post("/erp/products/:id/expiry-batches", authenticate, requireStaff, requ
       VALUES (${productId}, ${storeId}, ${qty}, ${dateStr}, ${lotNumber ?? null}, ${notes ?? null})
       RETURNING *
     `);
-    res.status(201).json(result.rows[0]);
-  } catch (err) { req.log.error(err); res.status(500).json({ error: "Internal server error" }); }
+    return res.status(201).json(result.rows[0]);
+  } catch (err) { req.log.error(err); return res.status(500).json({ error: "Internal server error" }); }
 });
 
 // DELETE /erp/expiry-batches/:batchId — remove a batch
 router.delete("/erp/expiry-batches/:batchId", authenticate, requireStaff, requireStore, requirePermission("products", "edit"), async (req: AuthRequest, res) => {
   try {
     const storeId = req.currentStoreId!;
-    const batchId = parseInt(req.params.batchId!, 10);
+    const batchId = pid(req, "batchId");
     if (isNaN(batchId)) return res.status(400).json({ error: "Invalid batch id" });
 
     const result = await db.execute(sql`
@@ -5707,8 +5710,8 @@ router.delete("/erp/expiry-batches/:batchId", authenticate, requireStaff, requir
       RETURNING id
     `);
     if (!result.rows.length) return res.status(404).json({ error: "Batch not found" });
-    res.json({ ok: true });
-  } catch (err) { req.log.error(err); res.status(500).json({ error: "Internal server error" }); }
+    return res.json({ ok: true });
+  } catch (err) { req.log.error(err); return res.status(500).json({ error: "Internal server error" }); }
 });
 
 // ── Product extra barcodes ─────────────────────────────────────────────────
@@ -5716,7 +5719,7 @@ router.delete("/erp/expiry-batches/:batchId", authenticate, requireStaff, requir
 router.get("/erp/products/:id/barcodes", authenticate, requireStaff, requireStore, requirePermission("products", "view"), async (req: AuthRequest, res) => {
   try {
     const storeId = req.currentStoreId!;
-    const productId = parseInt(req.params.id!, 10);
+    const productId = pid(req, "id");
     if (isNaN(productId)) return res.status(400).json({ error: "Invalid product id" });
 
     // Verify product belongs to store
@@ -5729,15 +5732,15 @@ router.get("/erp/products/:id/barcodes", authenticate, requireStaff, requireStor
       WHERE product_id = ${productId} AND store_id = ${storeId}
       ORDER BY created_at ASC
     `);
-    res.json(rows.rows);
-  } catch (err) { req.log.error(err); res.status(500).json({ error: "Internal server error" }); }
+    return res.json(rows.rows);
+  } catch (err) { req.log.error(err); return res.status(500).json({ error: "Internal server error" }); }
 });
 
 // POST /erp/products/:id/barcodes — add a new barcode to a product
 router.post("/erp/products/:id/barcodes", authenticate, requireStaff, requireStore, requirePermission("products", "manage_barcodes"), async (req: AuthRequest, res) => {
   try {
     const storeId = req.currentStoreId!;
-    const productId = parseInt(req.params.id!, 10);
+    const productId = pid(req, "id");
     if (isNaN(productId)) return res.status(400).json({ error: "Invalid product id" });
 
     const { barcode } = req.body as { barcode?: string };
@@ -5753,11 +5756,11 @@ router.post("/erp/products/:id/barcodes", authenticate, requireStaff, requireSto
       VALUES (${productId}, ${storeId}, ${bc})
       RETURNING id, barcode, created_at
     `);
-    res.status(201).json(result.rows[0]);
+    return res.status(201).json(result.rows[0]);
   } catch (err: unknown) {
     const pg = err as { code?: string };
     if (pg.code === "23505") return res.status(409).json({ error: "Ce barcode existe déjà" });
-    req.log.error(err); res.status(500).json({ error: "Internal server error" });
+    req.log.error(err); return res.status(500).json({ error: "Internal server error" });
   }
 });
 
@@ -5765,8 +5768,8 @@ router.post("/erp/products/:id/barcodes", authenticate, requireStaff, requireSto
 router.delete("/erp/products/:id/barcodes/:barcodeId", authenticate, requireStaff, requireStore, requirePermission("products", "manage_barcodes"), async (req: AuthRequest, res) => {
   try {
     const storeId = req.currentStoreId!;
-    const productId = parseInt(req.params.id!, 10);
-    const barcodeId = parseInt(req.params.barcodeId!, 10);
+    const productId = pid(req, "id");
+    const barcodeId = pid(req, "barcodeId");
     if (isNaN(productId) || isNaN(barcodeId)) return res.status(400).json({ error: "Invalid id" });
 
     const result = await db.execute(sql`
@@ -5775,8 +5778,8 @@ router.delete("/erp/products/:id/barcodes/:barcodeId", authenticate, requireStaf
       RETURNING id
     `);
     if (!result.rows.length) return res.status(404).json({ error: "Barcode not found" });
-    res.json({ ok: true });
-  } catch (err) { req.log.error(err); res.status(500).json({ error: "Internal server error" }); }
+    return res.json({ ok: true });
+  } catch (err) { req.log.error(err); return res.status(500).json({ error: "Internal server error" }); }
 });
 
 // GET /erp/alerts/expiring-products?days=N — batches expiring within N days

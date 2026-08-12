@@ -9,12 +9,11 @@
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
   },
   "private": true,
-  "devDependencies": {
-    "prettier": "^3.8.1",
-    "typescript": "~5.9.2"
-  },
   "dependencies": {
-    "@replit/connectors-sdk": "^0.4.0",
-    "xlsx": "^0.18.5"
+    "@replit/connectors-sdk": "^0.4.1"
+  },
+  "devDependencies": {
+    "prettier": "^3.9.6",
+    "typescript": "~5.9.3"
   }
 }

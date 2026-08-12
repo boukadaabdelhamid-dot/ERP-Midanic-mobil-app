@@ -1,41 +1,17 @@
-- [Inline nullish array loop](inline-nullish-array-loop.md) — `(data?.items ?? [])` in render creates new refs every cycle; wrap in useMemo when used as useEffect deps.
-- [GitHub push setup](github-push.md) — use listConnections('github').settings.access_token embedded in URL; never store token in files.
-- [Railway prod migration ordering](railway-prod-migration-ordering.md) — deploy runs `drizzle-kit push --force` before server boot; schema is prod's source of truth. Data migrations needed before a schema change go in railway.json before push, not at boot.
-- [Transfer movements double-count guard](transfer-movement-double-count.md) — merging inventory_movements with transfer events must exclude `reference LIKE 'TR-%'` or received transfers count twice.
-- [Accounting P&L vs Ledger](accounting-pnl-vs-ledger.md) — P&L deducts returned MARGIN (not full refund), excludes RETOUR-% AND category='purchase' (inventory=asset, COGS at sale; legacy PO-receipt rows). Ledger/caisse shows full cash movements.
-- [ERP typecheck & api-server](erp-typecheck-and-apiserver.md) — erp typecheck has pre-existing orval queryKey errors (app still runs); api-server is bundled (no HMR), restart for backend changes.
-- [api-client-react TS project references](api-client-react-ts-refs.md) — ERP uses composite TS project reference to lib/api-client-react; editing src/*.ts there requires `tsc --build` in that lib dir to regenerate dist/*.d.ts before ERP typecheck sees the new types.
-- [MIGRATION_SQL drift](migration-sql-drift.md) — hand-maintained boot MIGRATION_SQL drifts behind schema.ts (Replit-only; Railway uses drizzle push). Regenerate by diffing live DB vs a drizzle-push scratch DB; runMigrations tolerates "already exists".
-- [Cross-store product linkage](cross-store-product-link.md) — same SKU across stores linked by single key reference||barcode (no link table); copy/transfer/cross-store-stock must stay consistent; WS stock events are store-scoped.
-- [Cross-store global supplier account](cross-store-supplier-account.md) — suppliers share ONE balance via global_supplier_id; sync copies balance to siblings (no-op if null); debt is NEGATIVE; import-only gsid; cross-store race → clean rollback not corruption.
-- [API store context (testing)](api-store-context-testing.md) — ERP store comes from JWT claim (POST /auth/select-store), not a header; storefront uses ?store=/X-Store-Slug. No /api/stores route.
-- [Upload image URL resolution](upload-image-url-resolution.md) — storage falls back to local when object-storage vars absent; upload publicUrl MUST be absolute (frontends <img src> have no proxy/api-base across ports).
-- [Web store config slug — always default principal](web-store-config-slug.md) — StoreConfigProvider must never gate on slug (no enabled:!!slug); getSlug() falls back to "principal" so config is always fetched.
-- [Product visibility (VITRINE/isExposed)](product-visibility-isexposed.md) — API public-storefront path enforces isExposed=true (list + detail 404); staff/ERP JWT path sees all. Don't rely on frontend passing filterExposed.
-- [ERP permission module boundaries](erp-permission-module-boundaries.md) — caisse-transfers + account/me are shared all-staff Mon Compte ops (keep requireStaff, never caisse-gate); realtime is page-gated only (don't gate the shared WS).
-- [Staff password reset (ERP)](staff-password-reset.md) — admin-only PUT /erp/staff/:id/password; deliberately does NOT revoke existing JWTs (stateless auth, no session table).
-- [Unified contact roles](unified-contact-roles.md) — contacts = identity; customer/supplier are native role rows; type changes are bidirectional label flips, role rows NEVER deleted.
-- [Orders revenue fan-out trap](orders-revenue-fanout.md) — SUM(orders.total_amount) over an orders⋈order_items join multiplies revenue by item count; aggregate order totals in a separate orders-only CTE. Dashboard Bénéfice net = rev−COGS−returns−expenses (mirrors Analytics/Rapport).
-- [Global contact ID balance sync](global-contact-id-balance-sync.md) — centralized mutateCustomerBalance/mutateSupplierBalance; multi-key advisory locks (sorted, deadlock-safe) needed pre-gcid; boot migration needs same-store collision guard.
-- [Supplier save whitelists fields](supplier-save-body-mass-assign.md) — /erp/suppliers POST+PUT whitelist {name,contactName,email,phone,address,notes,contactType}+contactId; currentBalance/globalSupplierId/storeId never mass-assignable.
-- [Customer PUT balance mass-assign](customer-put-balance-mass-assign.md) — GET returns canonical (cust+supplier) balance; never write it back to the profile via PUT.
-- [Cross-store customer balance unify](cross-store-customer-balance-unify.md) — customer_profiles.user_id links customers cross-store; PUSH on mutation, ADOPT-from-sibling on create (never push 0).
-- [Credit-limit dual enforcement](credit-limit-dual-enforcement.md) — à-terme plafond enforced in 3 layers (orders/erp/PaymentDialog gate); mirror changes; never hard-reject creditLimit===0.
-- [Order payload empty-string fallbacks](order-payload-empty-string-fallbacks.md) — contact phone can be '' not null; order/draft required-field fallbacks must use `|| default`/trim, not `??`, or API 400s.
-- [Dashboard cross-store dedup](dashboard-cross-store-dedup.md) — all-stores SUM/COUNT over synced rows must DISTINCT ON the unifying key or it ×store-count.
-- [Artifact vs legacy workflow port conflict](artifact-vs-legacy-workflow-port-conflict.md) — converting to artifact services doesn't stop old .replit workflows; leftover processes squat ports and cause public 502s.
-- [Advisory lock must come before row locks](advisory-lock-before-row-lock.md) — a read-compute-write handler calling mutateCustomer/SupplierBalance must take its identity lock first via lockCustomerIdentity/lockSupplierIdentity, never a raw `.for("update")`, or lock order inverts and deadlocks.
-- [Caisse balance mutation patterns](caisse-balance-mutations.md) — caisses need no advisory locks (global); use lockCaissesById for any 2-caisse mutation, or opposite-direction endpoints deadlock.
-- [Balance snapshot columns](balance-snapshot-columns.md) — real balanceBefore/After on ops/movements rows; "ajustement" endpoints snapshot the UNIFIED contact balance, not the raw role balance (deliberate).
-- [Expo web workflow + baseUrl trap](expo-web-workflow-baseurl.md) — mobile app has no artifact.toml (can't create new artifacts that way); runs as plain workflow on :5000; app.json baseUrl must stay unset when served from root.
-- [Expo Go phone testing via tunnel](expo-go-phone-tunnel.md) — bundled `@expo/ngrok` tunnel is broken here; use a dedicated workflow running cloudflared quick-tunnel + EXPO_PACKAGER_PROXY_URL instead.
-- [API list-response envelope shapes vary](api-list-response-shapes.md) — `useGetProducts` returns `{products:[...]}` not `{data:[...]}` unlike most others; check schema field name per endpoint, never blanket `?? data ?? []`.
-- [Generated hook URL mismatch](generated-hook-url-mismatch.md) — a hook's name can resemble a different richer route than it calls; verify the literal URL via getGetXUrl() before typing its response.
-- [Caisse ownership-gated actions](caisse-ownership-gated-actions.md) — GET /erp/caisses hides main caisse from non-admins; session/transfer actions need ownership+permission; deposit/withdraw are admin-only, staff↔main directional.
-- [New staff zero permissions](new-staff-zero-permissions.md) — freshly created employees have no module permissions by default; grant them before treating a blank screen/403 as an app bug.
-- [HR module backend constraints](hr-module-backend-constraints.md) — attendance is create-only (no PUT, check-in/out = 2 rows); employee status/leave-type real values differ from web ERP UI options.
-- [Mobile raw-fetch admin endpoints](mobile-raw-fetch-admin-endpoints.md) — /erp/permissions/:userId and /auth/me(+/password) have no generated hook; mirror the web ERP's raw-fetch pattern instead of assuming a gap.
-- [drizzle-kit push unsafe here](drizzle-kit-push-unsafe.md) — hangs on interactive prompt / offers unrelated drops; apply schema.ts changes by hand via psql + verify with \d instead.
-- [openapi.yaml codegen drift risk](openapi-codegen-drift-risk.md) — some real routes were never added to openapi.yaml; regenerating orval can silently delete their hooks. Diff removed exports after every codegen run.
-- [Order source pos/online + expired-token trap](order-source-classification.md) — POST /orders must 401 on an invalid Bearer (never treat as guest); emails canonical lower(trim); no order_source backfills on valued rows.
-- [Railway startCommand must fail loudly](railway-startcommand-fail-loud.md) — chaining boot steps with `;` lets a failed `drizzle-kit push` be silently skipped while the server still boots on a stale schema; always use `set -e` + `&&`.
+- [Expo Web navigation timing](expo-web-navigation-timing.md) — defer protected-route redirects until the root navigation state is mounted.
+- [ERP product history permissions](erp-product-history-permissions.md) — product history is admin-only; mobile must disable history tabs for non-admin staff.
+- [Mobile ERP parity constraints](mobile-erp-parity-constraints.md) — setup-screen previews cannot validate authenticated ERP screens without a configured server session.
+- [Mobile product form parity](mobile-product-form-parity.md) — product dialogs follow generated API support; unsupported ERP-only operations stay out of Mobile.
+- [Mobile product columns](mobile-products-columns.md) — ERP separates Exposé, État, and Vitrine, but current API has no independent Vitrine field.
+- [Mobile sheet scrolling](mobile-sheet-scroll.md) — long bottom-sheet lists need bounded flex layout to scroll correctly on small screens.
+- [Mobile image upload](mobile-image-upload.md) — Expo Web needs a Blob in multipart FormData; native uses the URI descriptor.
+- [Mobile customer balance](mobile-customer-balance.md) — customer list balance may arrive as `current_balance`, omitted from the generated summary type.
+- [Mobile store-session synchronization](mobile-store-session-jwt-sync.md) — changing the active store must persist both the local store ID and the JWT returned by the selection endpoint.
+- [Mobile contact history coverage](mobile-contact-history-coverage.md) — customer history includes orders/returns/operations; supplier returns need an API endpoint not currently exposed.
+- [Mobile payroll coverage](mobile-payroll-coverage.md) — employee Paie uses the existing generated payroll hooks and stays under the payroll permission section.
+- [Mobile profitability reports](mobile-profitability-reports.md) — profitability reports use the existing admin report hooks for period and entity breakdowns.
+- [Mobile real-time dashboard](mobile-realtime-dashboard.md) — Temps réel mirrors ERP order KPIs with live polling, not a WebSocket-only empty screen.
+- [Mobile dashboard date filters](mobile-dashboard-date-filters.md) — custom dashboard periods use native start/end date pickers with the existing date-range API parameters.
+- [Expo Web date fields](expo-web-date-fields.md) — community native DateTimePicker needs an HTML date-input path when Mobile is previewed in a browser.
+- [Mobile drawer accordion](mobile-drawer-accordion.md) — sidebar group headings collapse to one open section while preserving route and permission behavior.
+- [Mobile home tile layout](mobile-home-tile-layout.md) — Accueil uses two-column colored square cards with light 3D depth and direct module navigation.

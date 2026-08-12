@@ -44,39 +44,6 @@ Thumbs.db
 .cursor/rules/nx-rules.mdc
 .github/instructions/nx.instructions.md
 
-# Environment variables & secrets
-.env
-.env.local
-.env.*.local
-*.env
-
 # Replit
 .cache/
 .local/
-
-# Build outputs (explicit)
-dist/
-build/
-.next/
-out/
-
-# Exception: lib/db compiled declarations are needed for TS project references
-!lib/db/dist/
-
-# Database
-*.sqlite
-*.sqlite3
-*.db
-
-# Logs
-logs/
-*.log
-
-# OS
-.DS_Store
-Thumbs.db
-
-
-# Local object-storage uploads (dev fallback)
-.uploads/
-artifacts/api-server/.uploads/
