@@ -38,6 +38,12 @@
           "cameraPermission": "يحتاج تطبيق ميدانيك إلى الكاميرا لمسح رموز الباركود"
         }
       ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "يستخدم Midanic Face ID لتسجيل الدخول بأمان"
+        }
+      ],
       "@react-native-community/datetimepicker"
     ],
     "experiments": {

@@ -4,6 +4,7 @@ import { View } from "react-native";
 import { useAuth } from "@/contexts/auth-context";
 import { useServer } from "@/contexts/server-context";
 import { LoadingView } from "@/components/ui";
+import { getBiometricEnabled } from "@/lib/biometric-auth";
 
 export default function Index() {
   const router = useRouter();
@@ -20,7 +21,15 @@ export default function Index() {
       return;
     }
 
-    router.replace(token ? "/home" : "/login");
+    let cancelled = false;
+    (async () => {
+      const biometricEnabled = token ? await getBiometricEnabled() : false;
+      if (cancelled) return;
+      router.replace(token && biometricEnabled ? "/login" : token ? "/home" : "/login");
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [rootNavigationState?.key, isServerReady, authReady, serverUrl, token, router]);
 
   return (

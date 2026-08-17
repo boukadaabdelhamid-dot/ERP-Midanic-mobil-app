@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -6,6 +6,10 @@ import {
   StyleSheet,
   TextInput,
   ActivityIndicator,
+  Platform,
+  Animated,
+  Easing,
+  Image,
   type ViewStyle,
   type TextStyle,
   type StyleProp,
@@ -91,6 +95,7 @@ export function FormField({
   autoCapitalize = "sentences",
   autoCorrect = true,
   autoComplete,
+  rightAccessory,
 }: {
   label: string;
   value: string;
@@ -104,29 +109,42 @@ export function FormField({
   autoCapitalize?: "none" | "sentences" | "words" | "characters";
   autoCorrect?: boolean;
   autoComplete?: "email" | "password" | "username" | "off";
+  rightAccessory?: React.ReactNode;
 }) {
   return (
     <View style={{ marginBottom: 14 }}>
       <Text style={styles.fieldLabel}>{label}</Text>
-      <TextInput
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor={colors.textMuted}
-        secureTextEntry={secureTextEntry}
-        keyboardType={keyboardType}
-        multiline={multiline}
-        editable={editable}
-        autoCapitalize={autoCapitalize}
-        autoCorrect={autoCorrect}
-        autoComplete={autoComplete}
+      <View
         style={[
-          styles.input,
-          multiline && { height: 90, textAlignVertical: "top" },
-          !editable && { backgroundColor: colors.background, color: colors.textMuted },
-          error && { borderColor: colors.danger },
+          rightAccessory ? styles.inputWrapper : null,
+          rightAccessory && error ? { borderColor: colors.danger } : null,
+          rightAccessory && !editable ? { backgroundColor: colors.background } : null,
         ]}
-      />
+      >
+        <TextInput
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor={colors.textMuted}
+          secureTextEntry={secureTextEntry}
+          keyboardType={keyboardType}
+          multiline={multiline}
+          editable={editable}
+          autoCapitalize={autoCapitalize}
+          autoCorrect={autoCorrect}
+          autoComplete={autoComplete}
+          style={[
+            styles.input,
+            rightAccessory ? styles.inputWithAccessory : null,
+            multiline && { height: 90, textAlignVertical: "top" },
+            !rightAccessory && error ? { borderColor: colors.danger } : null,
+            !rightAccessory && !editable ? { backgroundColor: colors.background } : null,
+            !editable && { color: colors.textMuted },
+            Platform.OS === "web" ? ({ outlineStyle: "none" } as any) : null,
+          ]}
+        />
+        {rightAccessory}
+      </View>
       {error ? <Text style={styles.fieldError}>{error}</Text> : null}
     </View>
   );
@@ -159,9 +177,29 @@ export function Badge({ label, tone = "default" }: { label: string; tone?: keyof
 // ---------------------------------------------------------------------------
 
 export function LoadingView({ label }: { label?: string }) {
+  const pulse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ]),
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulse]);
+
   return (
     <View style={styles.centered}>
-      <ActivityIndicator color={colors.primary} size="large" />
+      <Animated.View
+        style={{
+          opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }),
+          transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] }) }],
+        }}
+      >
+        <Image source={require("../assets/images/icon.png")} style={styles.loadingLogo} resizeMode="contain" />
+      </Animated.View>
       {label ? <Text style={styles.mutedText}>{label}</Text> : null}
     </View>
   );
@@ -227,10 +265,20 @@ const styles = StyleSheet.create({
     color: colors.text,
     backgroundColor: colors.surface,
   },
+  inputWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    backgroundColor: colors.surface,
+  },
+  inputWithAccessory: { borderWidth: 0, flex: 1 },
   fieldError: { color: colors.danger, fontSize: 12, marginTop: 4 },
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, alignSelf: "flex-start" },
   badgeText: { fontSize: 11, fontWeight: "600" },
   centered: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 6 },
+  loadingLogo: { width: 58, height: 58, borderRadius: 14 },
   mutedText: { color: colors.textMuted, fontSize: 13, textAlign: "center" },
   emptyTitle: { fontSize: 15, fontWeight: "600", color: colors.text, textAlign: "center" },
   sectionTitle: { fontSize: 13, fontWeight: "700", color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 },
