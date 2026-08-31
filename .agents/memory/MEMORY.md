@@ -15,3 +15,8 @@
 - [Expo Web date fields](expo-web-date-fields.md) — community native DateTimePicker needs an HTML date-input path when Mobile is previewed in a browser.
 - [Mobile drawer accordion](mobile-drawer-accordion.md) — sidebar group headings collapse to one open section while preserving route and permission behavior.
 - [Mobile home tile layout](mobile-home-tile-layout.md) — Accueil uses two-column colored square cards with light 3D depth and direct module navigation.
+- [Mobile API base URL](mobile-api-base-url.md) — configure the server as its origin, not an `/api`-suffixed URL, because generated requests already include `/api`.
+- [Mobile POS draft synchronization](mobile-pos-draft-synchronization.md) — server drafts are store-scoped; confirm them in place and clear local state only after success.
+- [API integration test runtime](api-integration-test-runtime.md) — run app-backed tests through the API tsx script; source imports and route timers affect plain Node exit.
+- [Supplier location fields](supplier-location-fields.md) — supplier wilaya and commune are nullable supplier-owned fields shared by Mobile and ERP.
+- [Expo 54 Mobile dependency alignment](expo54-mobile-dependency-alignment.md) — use SDK checks plus direct runtime links to avoid pnpm/Metro startup failures.
