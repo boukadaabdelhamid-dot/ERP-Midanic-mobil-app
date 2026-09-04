@@ -18,6 +18,7 @@
       "bundleIdentifier": "com.midanic.erp"
     },
     "android": {
+      "versionCode": 5,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#1B3057"
