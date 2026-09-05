@@ -27,11 +27,12 @@ import { colors } from "@/lib/colors";
 type DetailTab = "information" | "purchases" | "sales" | "summary" | "movements";
 
 export default function ProductDetail() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id } = useLocalSearchParams<{ id?: string | string[] }>();
   const router = useRouter();
   const { ready, isAdmin, can } = useProtectedRoute({ section: "products" });
   const { t, lang } = useLang();
-  const productId = Number(id);
+  const rawId = Array.isArray(id) ? id[0] : id;
+  const productId = Number(rawId);
   const currency = lang === "ar" ? "دج" : "DA";
   const [tab, setTab] = useState<DetailTab>("information");
 
@@ -101,7 +102,7 @@ export default function ProductDetail() {
           <Text style={styles.pageSubtitle}>#{product.id} · {product.reference ?? product.barcode ?? t("Sans référence", "بدون مرجع")}</Text>
         </View>
         {isAdmin || can("products", "edit") ? (
-          <Pressable onPress={() => router.push(`/products/${product.id}/edit` as never)} style={styles.editButton} testID="button-edit-product">
+          <Pressable onPress={() => router.push({ pathname: "/products/[id]/edit", params: { id: String(product.id) } } as never)} style={styles.editButton} testID="button-edit-product">
             <Feather name="edit-2" size={18} color={colors.primary} />
           </Pressable>
         ) : null}

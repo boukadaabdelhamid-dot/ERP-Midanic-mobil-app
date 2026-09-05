@@ -14,12 +14,13 @@ import { Card, Button, LoadingView, SectionTitle, Badge, Divider, ErrorState } f
 import { colors } from "@/lib/colors";
 
 export default function ProductDetail() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id } = useLocalSearchParams<{ id?: string | string[] }>();
   const router = useRouter();
   const { ready, isAdmin, can } = useProtectedRoute({ section: "products" });
   const { t, lang } = useLang();
   const currency = lang === "ar" ? "دج" : "DA";
-  const productId = Number(id);
+  const rawId = Array.isArray(id) ? id[0] : id;
+  const productId = Number(rawId);
 
   const { data: product, isLoading, isError } = useGetProduct(productId, {
     query: { enabled: ready && !!productId, queryKey: getGetProductQueryKey(productId) },
@@ -48,7 +49,7 @@ export default function ProductDetail() {
         <Button
           label={t("Modifier le produit", "تعديل المنتج")}
           variant="secondary"
-          onPress={() => router.push(`/products/${productId}/edit` as never)}
+          onPress={() => router.push({ pathname: "/products/[id]/edit", params: { id: String(productId) } } as never)}
           testID="button-edit-product"
         />
       ) : null}

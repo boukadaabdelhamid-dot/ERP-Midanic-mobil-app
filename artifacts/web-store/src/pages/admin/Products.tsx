@@ -4,7 +4,6 @@ import {
   useGetProducts, 
   useCreateProduct, 
   useUpdateProduct, 
-  useDeleteProduct,
   useGetCategories,
   useUploadImage,
   getGetProductsQueryKey,
@@ -57,7 +56,6 @@ export default function AdminProducts() {
   
   const createProduct = useCreateProduct();
   const updateProduct = useUpdateProduct();
-  const deleteProduct = useDeleteProduct();
   const uploadImage = useUploadImage();
 
   const form = useForm<ProductFormValues>({
@@ -93,13 +91,13 @@ export default function AdminProducts() {
   };
 
   const handleDelete = (id: number) => {
-    if (confirm("Are you sure you want to delete this product?")) {
-      deleteProduct.mutate(
-        { id },
+    if (confirm(isAr ? "هل تريد إزالة هذا المنتج من المتجر؟ سيبقى محفوظاً في نظام ERP." : "Remove this product from the store? It will remain saved in ERP.")) {
+      updateProduct.mutate(
+        { id, data: { isExposed: false } },
         {
           onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: getGetProductsQueryKey() });
-            toast({ title: "Product deleted successfully" });
+            toast({ title: isAr ? "تمت إزالة المنتج من المتجر" : "Product removed from store" });
           },
           onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" })
         }

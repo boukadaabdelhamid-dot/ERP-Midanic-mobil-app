@@ -20,13 +20,14 @@ import { ProductForm, emptyProductForm, productToForm, type ProductFormValues } 
 import { moveProductImage, normalizeLocalImages, normalizeProductImages, uploadProductImage } from "@/lib/product-images";
 
 export default function EditProduct() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id } = useLocalSearchParams<{ id?: string | string[] }>();
   const { ready, isAdmin, can } = useProtectedRoute({ section: "products" });
   const { t } = useLang();
   const router = useRouter();
   const queryClient = useQueryClient();
   const feedback = useApiFeedback();
-  const productId = Number(id);
+  const rawId = Array.isArray(id) ? id[0] : id;
+  const productId = Number(rawId);
 
   const { data: product, isLoading, isError } = useGetProduct(productId, {
     query: { enabled: ready && !!productId, queryKey: getGetProductQueryKey(productId) },
@@ -35,14 +36,14 @@ export default function EditProduct() {
   const [values, setValues] = useState<ProductFormValues>(emptyProductForm());
   const [images, setImages] = useState<ProductImage[]>([]);
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
+  const [hydratedProductId, setHydratedProductId] = useState<number | null>(null);
   useEffect(() => {
-    if (product && !hydrated) {
+    if (product && hydratedProductId !== productId) {
       setValues(productToForm(product));
       setImages(normalizeProductImages(product));
-      setHydrated(true);
+      setHydratedProductId(productId);
     }
-  }, [product, hydrated]);
+  }, [product, productId, hydratedProductId]);
 
   const updateProduct = useUpdateProduct();
   const generateBarcode = useGenerateProductBarcode();
@@ -52,7 +53,7 @@ export default function EditProduct() {
   if (!canEdit) {
     return <ErrorState title={t("Action non autorisée", "غير مسموح بهذا الإجراء")} />;
   }
-  if (isLoading || !hydrated) return <LoadingView />;
+  if (isLoading || hydratedProductId !== productId) return <LoadingView />;
   if (isError || !product) return <ErrorState title={t("Produit introuvable", "المنتج غير موجود")} />;
 
   async function handleAddImage() {
@@ -187,7 +188,7 @@ export default function EditProduct() {
           feedback.success("Produit mis à jour", "تم تحديث المنتج");
           queryClient.invalidateQueries({ queryKey: getGetProductQueryKey(productId) });
           queryClient.invalidateQueries({ queryKey: getGetProductsQueryKey() });
-          router.replace(`/products/${productId}` as never);
+           router.replace({ pathname: "/products/[id]", params: { id: String(productId) } } as never);
         },
         onError: (e) => feedback.error(e),
       },

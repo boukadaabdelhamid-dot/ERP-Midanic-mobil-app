@@ -38,7 +38,11 @@ export default function ProductsList() {
         emptyTitle={t("Aucun produit", "لا توجد منتجات")}
         header={<SearchBar value={search} onChangeText={setSearch} placeholder={t("Rechercher un produit...", "بحث عن منتج...")} />}
         renderItem={(p) => (
-          <Pressable style={styles.row} onPress={() => router.push(`/products/${p.id}` as never)} testID={`row-product-${p.id}`}>
+            <Pressable
+              style={styles.row}
+              onPress={() => router.push({ pathname: "/products/[id]", params: { id: String(p.id) } } as never)}
+              testID={`row-product-${p.id}`}
+            >
             {p.imageUrl ? (
               <Image source={{ uri: p.imageUrl }} style={styles.thumb} />
             ) : (

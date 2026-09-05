@@ -11,6 +11,7 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -218,6 +219,8 @@ export default function ProductsList() {
   const feedback = useApiFeedback();
   const { confirm } = useConfirm();
   const currency = lang === "ar" ? "دج" : "DA";
+  const { width } = useWindowDimensions();
+  const isMobileLayout = width < 768;
 
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<ArticleTab>("all");
@@ -257,7 +260,6 @@ export default function ProductsList() {
 
   const productsParams = useMemo(() => {
     const params: GetProductsParams & Record<string, unknown> = {
-      search: search.trim() || undefined,
       limit: 100,
       page,
       ...Object.fromEntries(
@@ -267,6 +269,10 @@ export default function ProductsList() {
         ]),
       ),
     };
+    const quickTerm = search.trim();
+    if (quickTerm) {
+      params.search = quickTerm;
+    }
 
     if (tab === "active") params.filterActive = "true";
     if (tab === "inactive") params.filterActive = "false";
@@ -441,6 +447,10 @@ export default function ProductsList() {
     setActionsProduct(null);
   }
 
+  function openProductEdit(productId: number) {
+    router.push({ pathname: "/products/[id]/edit", params: { id: String(productId) } } as never);
+  }
+
   function closeDetails() {
     setDetailOpen(false);
     setDetailProduct(null);
@@ -564,12 +574,14 @@ export default function ProductsList() {
 
       <View style={styles.searchRow}>
         <View style={styles.searchWrap}>
-          <SearchBar value={search} onChangeText={setSearch} placeholder={t("Rechercher par nom...", "البحث بالاسم...")} />
+         <SearchBar value={search} onChangeText={setSearch} placeholder={t("Nom, référence ou code-barres...", "الاسم أو المرجع أو الباركود...")} />
         </View>
-        <Pressable onPress={() => setColumnsOpen(true)} style={styles.columnsButton} testID="button-open-article-columns">
-          <Feather name="columns" size={17} color={colors.primary} />
-          <Text style={styles.columnsButtonText}>{t("Colonnes", "الأعمدة")}</Text>
-        </Pressable>
+        {!isMobileLayout ? (
+          <Pressable onPress={() => setColumnsOpen(true)} style={styles.columnsButton} testID="button-open-article-columns">
+            <Feather name="columns" size={17} color={colors.primary} />
+            <Text style={styles.columnsButtonText}>{t("Colonnes", "الأعمدة")}</Text>
+          </Pressable>
+        ) : null}
         <Pressable onPress={() => changeSort(sortKey === "name" ? "stock" : "name")} style={styles.sortButton} testID="button-sort-articles">
           <Feather name={sortDescending ? "arrow-down" : "arrow-up"} size={16} color={colors.primary} />
           <Text style={styles.sortButtonText}>{sortKey === "name" ? t("Nom", "الاسم") : sortKey === "stock" ? t("Stock", "المخزون") : sortKey === "price" ? t("Prix", "السعر") : t("Date", "التاريخ")}</Text>
@@ -579,6 +591,18 @@ export default function ProductsList() {
           {activeFilterCount > 0 ? <View style={styles.filterBadge}><Text style={styles.filterBadgeText}>{activeFilterCount}</Text></View> : null}
         </Pressable>
       </View>
+
+      {isMobileLayout ? (
+        <View style={styles.webOnlyNotice} testID="mobile-products-web-only-notice">
+          <Feather name="monitor" size={16} color={colors.primary} />
+          <Text style={styles.webOnlyNoticeText}>
+            {t(
+              "Import Excel, étiquettes, export et gestion des codes-barres supplémentaires : disponibles sur ERP Web.",
+              "استيراد Excel والملصقات والتصدير وإدارة الباركودات الإضافية: متاحة في ERP Web.",
+            )}
+          </Text>
+        </View>
+      ) : null}
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll} contentContainerStyle={styles.tabsContent}>
         {tabs.map((item) => (
@@ -611,7 +635,7 @@ export default function ProductsList() {
           <EmptyState title={t("Impossible de charger les articles", "تعذر تحميل المقالات")} subtitle={t("Vérifiez la connexion puis réessayez.", "تحقق من الاتصال ثم أعد المحاولة.")} />
           <Button label={t("Réessayer", "إعادة المحاولة")} onPress={() => productsQ.refetch()} />
         </View>
-      ) : (
+      ) : !isMobileLayout ? (
         <ArticleTable
           products={products}
           families={families}
@@ -628,6 +652,26 @@ export default function ProductsList() {
           onFilterChange={updateColumnFilter}
           onToggleSelected={toggleSelected}
           onToggleAll={toggleAllSelected}
+          onEndReached={() => {
+            if (hasMore && !productsQ.isFetching) setPage((current) => current + 1);
+          }}
+          hasMore={hasMore}
+          emptyTitle={t("Aucun article", "لا توجد مقالات")}
+          emptySubtitle={search || activeFilterCount > 0 ? t("Essayez d'autres filtres", "جرّب فلاتر أخرى") : undefined}
+        />
+      ) : (
+        <MobileProductList
+          products={products}
+          lang={lang}
+          currency={currency}
+          isRefreshing={productsQ.isRefetching}
+          onRefresh={() => productsQ.refetch()}
+          onOpen={(product) => openDetails(product)}
+          onActions={setActionsProduct}
+          onEdit={(product) => openProductEdit(product.id)}
+          onDelete={(product) => void handleDelete(product)}
+          canEdit={canEdit}
+          canDelete={canDelete}
           onEndReached={() => {
             if (hasMore && !productsQ.isFetching) setPage((current) => current + 1);
           }}
@@ -762,7 +806,7 @@ export default function ProductsList() {
         onClose={() => setActionsProduct(null)}
         onEdit={(product) => {
           setActionsProduct(null);
-          router.push(`/products/${product.id}/edit` as never);
+          openProductEdit(product.id);
         }}
         onDetails={(product) => openDetails(product)}
         onHistory={(product) => openDetails(product, "mouvements")}
@@ -772,7 +816,7 @@ export default function ProductsList() {
         }}
         onImages={(product) => {
           setActionsProduct(null);
-          router.push(`/products/${product.id}/edit` as never);
+          openProductEdit(product.id);
         }}
         onInventory={() => {
           if (actionsProduct) void adjustProductStock(actionsProduct);
@@ -784,7 +828,7 @@ export default function ProductsList() {
         }}
         onPrices={(product) => {
           setActionsProduct(null);
-          router.push(`/products/${product.id}/edit` as never);
+          openProductEdit(product.id);
         }}
         onBarcode={(product) => {
           setActionsProduct(null);
@@ -965,6 +1009,68 @@ function ArticleTable({
         />
       </View>
     </ScrollView>
+  );
+}
+
+function MobileProductList({
+  products,
+  lang,
+  currency,
+  isRefreshing,
+  onRefresh,
+  onOpen,
+  onActions,
+  onEdit,
+  onDelete,
+  canEdit,
+  canDelete,
+  onEndReached,
+  hasMore,
+  emptyTitle,
+  emptySubtitle,
+}: {
+  products: Product[];
+  lang: string;
+  currency: string;
+  isRefreshing: boolean;
+  onRefresh: () => void;
+  onOpen: (product: Product) => void;
+  onActions: (product: Product) => void;
+  onEdit: (product: Product) => void;
+  onDelete: (product: Product) => void;
+  canEdit: boolean;
+  canDelete: boolean;
+  onEndReached: () => void;
+  hasMore: boolean;
+  emptyTitle: string;
+  emptySubtitle?: string;
+}) {
+  return (
+    <FlatList
+      data={products}
+      keyExtractor={(product) => String(product.id)}
+      contentContainerStyle={products.length ? styles.mobileProductsContent : styles.mobileProductsEmpty}
+      refreshing={isRefreshing}
+      onRefresh={onRefresh}
+      onEndReached={onEndReached}
+      onEndReachedThreshold={0.6}
+      ListEmptyComponent={<EmptyState title={emptyTitle} subtitle={emptySubtitle} />}
+      ListFooterComponent={hasMore ? <View style={styles.tableFooter}><ActivityIndicator size="small" color={colors.primary} /></View> : null}
+      renderItem={({ item }) => (
+        <ArticleCard
+          product={item}
+          lang={lang}
+          currency={currency}
+          compact={false}
+          canEdit={canEdit}
+          canDelete={canDelete}
+          onOpen={() => onOpen(item)}
+          onEdit={() => onEdit(item)}
+          onDelete={() => onDelete(item)}
+          onActions={() => onActions(item)}
+        />
+      )}
+    />
   );
 }
 
@@ -1354,6 +1460,7 @@ function ArticleCard({
   onOpen,
   onEdit,
   onDelete,
+  onActions,
 }: {
   product: Product;
   lang: string;
@@ -1364,7 +1471,9 @@ function ArticleCard({
   onOpen: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onActions: () => void;
 }) {
+  const { t } = useLang();
   const primaryImage = product.primaryImage ?? product.imageUrl ?? product.images?.[0]?.url ?? null;
   const stock = Number(product.stock ?? 0);
   const title = lang === "ar" ? product.nameAr : product.nameEn;
@@ -1387,6 +1496,9 @@ function ArticleCard({
           {!compact && product.brand ? <Text style={styles.articleMeta} numberOfLines={1}>{product.brand}{product.model ? ` · ${product.model}` : ""}</Text> : null}
         </View>
         <Badge label={product.isActive === false ? "INACTIF" : product.isExposed ? "VITRINE" : "ACTIF"} tone={product.isActive === false ? "muted" : product.isExposed ? "info" : "success"} />
+        <Pressable onPress={onActions} style={styles.cardMoreButton} hitSlop={8} testID={`button-mobile-product-actions-${product.id}`}>
+          <Feather name="more-vertical" size={19} color={colors.textMuted} />
+        </Pressable>
       </View>
 
       <View style={styles.metrics}>
@@ -1406,18 +1518,18 @@ function ArticleCard({
       <View style={styles.cardActions}>
         <Pressable onPress={onOpen} style={styles.cardAction}>
           <Feather name="eye" size={15} color={colors.textMuted} />
-          <Text style={styles.cardActionText}>Voir</Text>
+          <Text style={styles.cardActionText}>{t("Voir", "عرض")}</Text>
         </Pressable>
         {canEdit ? (
           <Pressable onPress={onEdit} style={styles.cardAction}>
             <Feather name="edit-2" size={15} color={colors.primary} />
-            <Text style={[styles.cardActionText, { color: colors.primary }]}>Modifier</Text>
+              <Text style={[styles.cardActionText, { color: colors.primary }]}>{t("Modifier", "تعديل")}</Text>
           </Pressable>
         ) : null}
         {canDelete ? (
           <Pressable onPress={onDelete} style={[styles.cardAction, styles.deleteAction]}>
             <Feather name="trash-2" size={15} color={colors.danger} />
-            <Text style={[styles.cardActionText, { color: colors.danger }]}>Supprimer</Text>
+              <Text style={[styles.cardActionText, { color: colors.danger }]}>{t("Supprimer", "حذف")}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -1466,12 +1578,15 @@ const styles = StyleSheet.create({
   quickFilter: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 },
   quickFilterText: { color: colors.text, fontSize: 12, fontWeight: "500" },
   listContent: { padding: 12, paddingBottom: 100 },
+  mobileProductsContent: { padding: 12, paddingBottom: 110 },
+  mobileProductsEmpty: { flexGrow: 1, padding: 24, paddingBottom: 110 },
   gridRow: { gap: 10, paddingHorizontal: 12 },
   gridItem: { flex: 1, maxWidth: "50%" },
   articleCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 15, padding: 12, marginBottom: 10 },
   articleCardCompact: { padding: 9, minHeight: 245 },
   cardTop: { flexDirection: "row", alignItems: "center", gap: 10 },
   cardTopCompact: { alignItems: "flex-start", flexDirection: "column" },
+  cardMoreButton: { width: 30, height: 34, alignItems: "center", justifyContent: "center" },
   articleImage: { width: 68, height: 68, borderRadius: 10, backgroundColor: colors.background },
   articleImageCompact: { width: "100%", height: 112, borderRadius: 10 },
   imagePlaceholder: { alignItems: "center", justifyContent: "center" },
@@ -1499,6 +1614,8 @@ const styles = StyleSheet.create({
   footerButton: { flex: 1 },
   filterHint: { flexDirection: "row", alignItems: "center", gap: 8, padding: 10, borderRadius: 9, backgroundColor: "#EEF3FA", marginBottom: 14 },
   filterHintText: { flex: 1, color: colors.primary, fontSize: 12 },
+  webOnlyNotice: { flexDirection: "row", alignItems: "flex-start", gap: 8, marginHorizontal: 12, marginTop: 10, padding: 10, borderRadius: 10, backgroundColor: "#EEF3FA" },
+  webOnlyNoticeText: { flex: 1, color: colors.primary, fontSize: 12, lineHeight: 18 },
   filterSectionLabel: { color: colors.text, fontWeight: "800", fontSize: 13, marginTop: 4, marginBottom: 12 },
   columnsButton: { height: 45, paddingHorizontal: 11, borderRadius: 11, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 6 },
   columnsButtonText: { color: colors.primary, fontSize: 12, fontWeight: "700" },
