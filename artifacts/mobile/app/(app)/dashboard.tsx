@@ -90,13 +90,13 @@ function KpiCard({
   );
 }
 const kpi = StyleSheet.create({
-  card: { flex: 1, minWidth: "45%", backgroundColor: colors.surface, borderRadius: 12, borderWidth: 1, borderColor: colors.border, padding: 14, gap: 4 },
+  card: { flex: 1, minWidth: "45%", backgroundColor: colors.surface, borderRadius: 9, borderWidth: 1, borderColor: colors.border, borderTopWidth: 2, borderTopColor: colors.accent, padding: 14, gap: 6 },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   label: { fontSize: 12, color: colors.textMuted, fontWeight: "600", flex: 1, marginRight: 4 },
   value: { fontSize: 18, fontWeight: "800" },
   hint: { fontSize: 10, color: colors.textMuted, marginTop: 2 },
-  warningBadge: { backgroundColor: "#fed7aa", borderRadius: 8, paddingHorizontal: 5, paddingVertical: 1 },
-  warningTxt: { fontSize: 10, fontWeight: "700", color: "#c2410c" },
+  warningBadge: { backgroundColor: "#F3EBD9", borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 },
+  warningTxt: { fontSize: 10, fontWeight: "700", color: colors.warning },
 });
 
 // ─── KPI row (2 per row) ──────────────────────────────────────────────────────
@@ -133,11 +133,11 @@ function MTable({ headers, rows, emptyText }: {
   );
 }
 const mt = StyleSheet.create({
-  wrap: { borderRadius: 10, borderWidth: 1, borderColor: colors.border, overflow: "hidden" },
-  head: { flexDirection: "row", backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border, paddingHorizontal: 12, paddingVertical: 8 },
+  wrap: { borderRadius: 8, borderWidth: 1, borderColor: colors.border, overflow: "hidden", backgroundColor: colors.surface },
+  head: { flexDirection: "row", backgroundColor: "#ECECE6", borderBottomWidth: 1, borderBottomColor: colors.border, paddingHorizontal: 12, paddingVertical: 10 },
   th: { flex: 1, fontSize: 11, fontWeight: "700", color: colors.textMuted, textTransform: "uppercase" },
   right: { textAlign: "right" },
-  row: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: colors.border, paddingHorizontal: 12, paddingVertical: 10 },
+  row: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: colors.border, paddingHorizontal: 12, paddingVertical: 12, backgroundColor: colors.surface },
   cell: { flex: 1, justifyContent: "center" },
   rightCell: { alignItems: "flex-end" },
   td: { fontSize: 13, color: colors.text },
@@ -147,9 +147,9 @@ const mt = StyleSheet.create({
 // ─── Total row for tables ─────────────────────────────────────────────────────
 function TotalRow({ cells }: { cells: string[] }) {
   return (
-    <View style={{ flexDirection: "row", backgroundColor: "#fff1f2", borderTopWidth: 2, borderTopColor: "#fecdd3", paddingHorizontal: 12, paddingVertical: 10 }}>
+    <View style={{ flexDirection: "row", backgroundColor: "#F1E9D6", borderTopWidth: 2, borderTopColor: colors.accent, paddingHorizontal: 12, paddingVertical: 10 }}>
       {cells.map((c, i) => (
-        <Text key={i} style={[{ flex: 1, fontSize: 12, fontWeight: "800", color: "#9f1239" }, i > 0 && { textAlign: "right" }]}>{c}</Text>
+        <Text key={i} style={[{ flex: 1, fontSize: 12, fontWeight: "800", color: colors.primary }, i > 0 && { textAlign: "right" }]}>{c}</Text>
       ))}
     </View>
   );
@@ -208,7 +208,7 @@ function DatePresetBar({
   );
 }
 const dp = StyleSheet.create({
-  pill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
+  pill: { minHeight: 38, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 6, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, justifyContent: "center" },
   pillOn: { backgroundColor: colors.primary, borderColor: colors.primary },
   txt: { fontSize: 13, color: colors.text, fontWeight: "500" },
   txtOn: { color: "#fff" },
@@ -539,13 +539,13 @@ function VentesTab({ t, currency, canViewProfit }: { t: (fr: string, ar: string)
                 </View>
               ))}
               {rows.length > 0 && (
-                <View style={[mt.row, { backgroundColor: "#fff1f2", borderTopWidth: 2, borderTopColor: "#fecdd3", paddingHorizontal: 8 }]}>
-                  <Text style={{ flex: 1.5, fontSize: 11, fontWeight: "800", color: "#9f1239" }}>TOTAL</Text>
-                  <Text style={{ flex: 1, textAlign: "right", fontSize: 11, fontWeight: "800", color: "#9f1239" }}>{fmtNum(totals.montant)}</Text>
-                  <Text style={{ flex: 1, textAlign: "right", fontSize: 11, fontWeight: "700", color: "#9f1239" }}>{fmtNum(totals.reduction)}</Text>
-                  <Text style={{ flex: 1, textAlign: "right", fontSize: 11, fontWeight: "700", color: "#9f1239" }}>{fmtNum(totals.retours)}</Text>
-                  <Text style={{ flex: 1, textAlign: "right", fontSize: 11, fontWeight: "700", color: "#9f1239" }}>{fmtNum(totals.charges)}</Text>
-                  {canViewProfit && <Text style={{ flex: 1, textAlign: "right", fontSize: 11, fontWeight: "800", color: "#9f1239" }}>{fmtNum(totals.benefice)}</Text>}
+                <View style={[mt.row, { backgroundColor: "#F1E9D6", borderTopWidth: 2, borderTopColor: colors.accent, paddingHorizontal: 8 }]}>
+                  <Text style={{ flex: 1.5, fontSize: 11, fontWeight: "800", color: colors.primary }}>TOTAL</Text>
+                  <Text style={{ flex: 1, textAlign: "right", fontSize: 11, fontWeight: "800", color: colors.primary }}>{fmtNum(totals.montant)}</Text>
+                  <Text style={{ flex: 1, textAlign: "right", fontSize: 11, fontWeight: "700", color: colors.primary }}>{fmtNum(totals.reduction)}</Text>
+                  <Text style={{ flex: 1, textAlign: "right", fontSize: 11, fontWeight: "700", color: colors.primary }}>{fmtNum(totals.retours)}</Text>
+                  <Text style={{ flex: 1, textAlign: "right", fontSize: 11, fontWeight: "700", color: colors.primary }}>{fmtNum(totals.charges)}</Text>
+                  {canViewProfit && <Text style={{ flex: 1, textAlign: "right", fontSize: 11, fontWeight: "800", color: colors.primary }}>{fmtNum(totals.benefice)}</Text>}
                 </View>
               )}
             </View>
@@ -649,12 +649,12 @@ function BeneficeTab({ t, currency }: { t: (fr: string, ar: string) => string; c
                 </View>
               ))}
               {rows.length > 0 && (
-                <View style={[mt.row, { backgroundColor: "#fff1f2", borderTopWidth: 2, borderTopColor: "#fecdd3", paddingHorizontal: 8 }]}>
-                  <Text style={{ flex: 1.4, fontSize: 11, fontWeight: "800", color: "#9f1239" }}>TOTAL</Text>
-                  <Text style={{ flex: 1, textAlign: "right", fontSize: 11, fontWeight: "700", color: "#9f1239" }}>{fmtNum(totals.marge)}</Text>
-                  <Text style={{ flex: 1, textAlign: "right", fontSize: 11, fontWeight: "700", color: "#9f1239" }}>{fmtNum(totals.retours)}</Text>
-                  <Text style={{ flex: 1, textAlign: "right", fontSize: 11, fontWeight: "700", color: "#9f1239" }}>{fmtNum(totals.charges)}</Text>
-                  <Text style={{ flex: 1, textAlign: "right", fontSize: 11, fontWeight: "800", color: "#9f1239" }}>{fmtNum(totals.benefice)}</Text>
+                <View style={[mt.row, { backgroundColor: "#F1E9D6", borderTopWidth: 2, borderTopColor: colors.accent, paddingHorizontal: 8 }]}>
+                  <Text style={{ flex: 1.4, fontSize: 11, fontWeight: "800", color: colors.primary }}>TOTAL</Text>
+                  <Text style={{ flex: 1, textAlign: "right", fontSize: 11, fontWeight: "700", color: colors.primary }}>{fmtNum(totals.marge)}</Text>
+                  <Text style={{ flex: 1, textAlign: "right", fontSize: 11, fontWeight: "700", color: colors.primary }}>{fmtNum(totals.retours)}</Text>
+                  <Text style={{ flex: 1, textAlign: "right", fontSize: 11, fontWeight: "700", color: colors.primary }}>{fmtNum(totals.charges)}</Text>
+                  <Text style={{ flex: 1, textAlign: "right", fontSize: 11, fontWeight: "800", color: colors.primary }}>{fmtNum(totals.benefice)}</Text>
                 </View>
               )}
             </View>
@@ -766,10 +766,10 @@ function VentePlusTab({ t, currency, canViewProfit }: { t: (fr: string, ar: stri
             </Pressable>
           ))}
           {/* Grand total */}
-          <View style={[mt.head, { backgroundColor: "#fff1f2", borderRadius: 8, borderWidth: 1, borderColor: "#fecdd3" }]}>
-            <Text style={{ flex: 1, fontSize: 11, fontWeight: "800", color: "#9f1239" }}>TOTAL ({sorted.length})</Text>
-            <Text style={{ fontSize: 11, fontWeight: "700", color: "#9f1239" }}>Qté: {gTot.qte.toLocaleString()}</Text>
-            <Text style={{ fontSize: 11, fontWeight: "800", color: "#9f1239", marginLeft: 8 }}>{fmtNum(gTot.montant)} {currency}</Text>
+          <View style={[mt.head, { backgroundColor: "#F1E9D6", borderRadius: 8, borderWidth: 1, borderColor: colors.accent }]}>
+            <Text style={{ flex: 1, fontSize: 11, fontWeight: "800", color: colors.primary }}>TOTAL ({sorted.length})</Text>
+            <Text style={{ fontSize: 11, fontWeight: "700", color: colors.primary }}>Qté: {gTot.qte.toLocaleString()}</Text>
+            <Text style={{ fontSize: 11, fontWeight: "800", color: colors.primary, marginLeft: 8 }}>{fmtNum(gTot.montant)} {currency}</Text>
             {canViewProfit && <Text style={{ fontSize: 11, fontWeight: "800", color: gTot.benefice < 0 ? colors.danger : colors.success, marginLeft: 8 }}>{fmtNum(gTot.benefice)} {currency}</Text>}
           </View>
           {/* Pagination */}
@@ -815,13 +815,13 @@ function VentePlusTab({ t, currency, canViewProfit }: { t: (fr: string, ar: stri
 
 const vp = StyleSheet.create({
   row: { backgroundColor: colors.surface, borderRadius: 10, borderWidth: 1, borderColor: colors.border, padding: 12, flexDirection: "row", gap: 8 },
-  retourRow: { backgroundColor: "#fffbeb", borderColor: "#fde68a" },
+  retourRow: { backgroundColor: "#F8F3E8", borderColor: "#E8D9B8" },
   name: { fontSize: 14, fontWeight: "700", color: colors.text },
   meta: { fontSize: 11, color: colors.textMuted },
   amount: { fontSize: 14, fontWeight: "700", color: colors.text },
   qty: { fontSize: 11, color: colors.textMuted },
   profit: { fontSize: 12, fontWeight: "700" },
-  retourBadge: { backgroundColor: "#fef3c7", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignSelf: "flex-start" },
+  retourBadge: { backgroundColor: "#F3EBD9", paddingHorizontal: 6, paddingVertical: 3, borderRadius: 4, alignSelf: "flex-start" },
   retourBadgeTxt: { fontSize: 9, fontWeight: "700", color: "#92400e" },
 });
 
@@ -1044,8 +1044,8 @@ export default function Dashboard() {
 const dash = StyleSheet.create({
   tabBar: { borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.surface },
   tabContent: { flexDirection: "row", paddingHorizontal: 4 },
-  tab: { paddingHorizontal: 14, paddingVertical: 12 },
-  tabActive: { borderBottomWidth: 2, borderBottomColor: colors.primary },
+  tab: { paddingHorizontal: 15, paddingVertical: 13, minHeight: 48, justifyContent: "center" },
+  tabActive: { borderBottomWidth: 3, borderBottomColor: colors.accent },
   tabTxt: { fontSize: 13, fontWeight: "500", color: colors.textMuted },
   tabTxtActive: { color: colors.primary, fontWeight: "700" },
 });

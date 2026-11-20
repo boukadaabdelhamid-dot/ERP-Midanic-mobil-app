@@ -143,7 +143,7 @@ export default function NewTransfer() {
 
   return (
     <Screen>
-      <Card>
+      <Card style={styles.formCard}>
         <SectionTitle>{t("Destination", "الوجهة")}</SectionTitle>
         <PickerField<Store>
           label={t("Magasin de destination", "متجر الوجهة")}
@@ -158,7 +158,7 @@ export default function NewTransfer() {
         {canSend ? (
           <View style={[styles.modeRow, isRTL && styles.rowRTL]}>
             <Button
-              label={t("Demande (avec approbation)", "طلب (بموافقة)")}
+              label={t("Demande avec accord", "طلب بموافقة")}
               variant={mode === "request" ? "primary" : "secondary"}
               onPress={() => setMode("request")}
               style={{ flex: 1 }}
@@ -173,7 +173,7 @@ export default function NewTransfer() {
         ) : null}
       </Card>
 
-      <Card>
+      <Card style={styles.formCard}>
         <SectionTitle>{t("Produits", "المنتجات")}</SectionTitle>
         <PickerField<Product>
           label={t("Ajouter un produit", "إضافة منتج")}
@@ -188,7 +188,10 @@ export default function NewTransfer() {
         />
 
         {cart.length === 0 ? (
-          <Text style={styles.muted}>{t("Aucun produit ajouté", "لم تتم إضافة أي منتج")}</Text>
+          <View style={styles.emptyCart}>
+            <Feather name="package" size={18} color={colors.textMuted} />
+            <Text style={styles.muted}>{t("Aucun produit ajouté", "لم تتم إضافة أي منتج")}</Text>
+          </View>
         ) : (
           cart.map((line, i) => (
             <View key={line.product.id}>
@@ -201,7 +204,7 @@ export default function NewTransfer() {
                   <Text style={styles.cartSub}>{t("Disponible", "متوفر")}: {line.product.stock}</Text>
                 </View>
                 <QuantityStepper value={line.quantity} onChange={(q) => updateQuantity(line.product.id, q)} max={line.product.stock} />
-                <Pressable onPress={() => removeLine(line.product.id)} hitSlop={8} testID={`button-remove-line-${line.product.id}`}>
+                <Pressable onPress={() => removeLine(line.product.id)} style={styles.removeButton} hitSlop={8} testID={`button-remove-line-${line.product.id}`}>
                   <Feather name="trash-2" size={18} color={colors.danger} />
                 </Pressable>
               </View>
@@ -211,8 +214,8 @@ export default function NewTransfer() {
       </Card>
 
       {cart.length > 0 ? (
-        <Card>
-          <View style={styles.totalRow}>
+        <Card style={styles.formCard}>
+          <View style={[styles.totalRow, isRTL && styles.rowRTL]}>
             <Text style={styles.totalLabel}>{t("Quantité totale", "الكمية الإجمالية")}</Text>
             <Text style={styles.totalValue}>{totalQty}</Text>
           </View>
@@ -231,14 +234,17 @@ export default function NewTransfer() {
 }
 
 const styles = StyleSheet.create({
-  modeRow: { flexDirection: "row", gap: 10, marginTop: 4 },
+  formCard: { borderTopWidth: 2, borderTopColor: colors.accent },
+  modeRow: { flexDirection: "row", gap: 10, marginTop: 8 },
   rowRTL: { flexDirection: "row-reverse" },
   muted: { fontSize: 13, color: colors.textMuted, marginTop: 4 },
-  cartRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 8 },
+  emptyCart: { minHeight: 64, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 8, backgroundColor: colors.background },
+  cartRow: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 62, paddingVertical: 10 },
   cartName: { fontSize: 14, fontWeight: "600", color: colors.text },
   cartSub: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
-  totalRow: { flexDirection: "row", justifyContent: "space-between" },
+  removeButton: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
+  totalRow: { minHeight: 52, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, borderRadius: 8, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.accent },
   totalLabel: { fontSize: 15, fontWeight: "600", color: colors.text },
   totalValue: { fontSize: 18, fontWeight: "700", color: colors.primary },
-  error: { color: colors.danger, fontSize: 13, textAlign: "center" },
+  error: { color: colors.danger, fontSize: 13, textAlign: "center", backgroundColor: colors.background, borderWidth: 1, borderColor: colors.danger, borderRadius: 8, padding: 10 },
 });

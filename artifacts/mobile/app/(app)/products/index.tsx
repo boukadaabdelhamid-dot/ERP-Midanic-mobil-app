@@ -51,6 +51,9 @@ import { PickerField } from "@/components/Picker";
 import { SearchBar } from "@/components/ListScreen";
 import { SheetModal } from "@/components/SheetModal";
 import { colors } from "@/lib/colors";
+import { useCurrentStore } from "@/hooks/use-current-store";
+import { canShowProductionClassification } from "@/lib/production-products";
+import { useStoreContext } from "@/contexts/store-context";
 
 type ArticleTab = "all" | "active" | "inactive" | "exposed" | "out";
 type ArticleSortKey = "name" | "stock" | "price" | "createdAt";
@@ -221,11 +224,17 @@ export default function ProductsList() {
   const currency = lang === "ar" ? "دج" : "DA";
   const { width } = useWindowDimensions();
   const isMobileLayout = width < 768;
+  const { isFactory } = useCurrentStore();
+  const { currentStoreId } = useStoreContext();
+  const canViewManufacturing = canShowProductionClassification(isFactory, isAdmin || can("manufacturing", "view"));
+  const canCreateManufacturing = canShowProductionClassification(isFactory, isAdmin || can("manufacturing", "create"));
+  const [manufacturingRole, setManufacturingRole] = useState<"raw_material" | "finished_good">("raw_material");
 
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<ArticleTab>("all");
   const [page, setPage] = useState(1);
   const [listedProducts, setListedProducts] = useState<Product[]>([]);
+  const [listedStoreId, setListedStoreId] = useState<number | null>(null);
   const [sortKey, setSortKey] = useState<ArticleSortKey>("name");
   const [sortDescending, setSortDescending] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -262,6 +271,7 @@ export default function ProductsList() {
     const params: GetProductsParams & Record<string, unknown> = {
       limit: 100,
       page,
+      manufacturingRole: canViewManufacturing ? manufacturingRole : undefined,
       ...Object.fromEntries(
         Object.entries(filters).map(([key, value]) => [
           key,
@@ -280,13 +290,12 @@ export default function ProductsList() {
     if (tab === "out") params.filterStock = "0";
 
     return params as GetProductsParams;
-  }, [filters, page, search, tab]);
+  }, [filters, page, search, tab, canViewManufacturing, manufacturingRole]);
 
   const productsQ = useGetProducts(productsParams, {
     query: {
       enabled: ready,
-      queryKey: getGetProductsQueryKey(productsParams),
-      placeholderData: (previous) => previous,
+      queryKey: [...getGetProductsQueryKey(productsParams), currentStoreId],
     },
   });
   useEffect(() => {
@@ -309,18 +318,21 @@ export default function ProductsList() {
     setPage(1);
     setSelectedIds([]);
     setListedProducts([]);
-  }, [filters, search, tab]);
+    setListedStoreId(null);
+  }, [filters, search, tab, manufacturingRole, currentStoreId]);
 
   useEffect(() => {
     const incoming = productsQ.data?.products ?? [];
+    setListedStoreId(currentStoreId);
     setListedProducts((current) => {
       if (page === 1) return incoming;
       const seen = new Set(current.map((product) => product.id));
       return [...current, ...incoming.filter((product) => !seen.has(product.id))];
     });
-  }, [page, productsQ.data]);
+  }, [page, productsQ.data, currentStoreId]);
 
   const products = useMemo(() => {
+    if (currentStoreId == null || listedStoreId !== currentStoreId) return [];
     const sorted = [...listedProducts];
     sorted.sort((a, b) => {
       let left: string | number = a.nameEn;
@@ -341,7 +353,7 @@ export default function ProductsList() {
       return sortDescending ? -result : result;
     });
     return sorted;
-  }, [lang, listedProducts, sortDescending, sortKey]);
+  }, [currentStoreId, lang, listedProducts, listedStoreId, sortDescending, sortKey]);
   const total = productsQ.data?.total ?? 0;
   const historyQ = useGetProductHistory(detailProduct?.id ?? 0, {
     query: {
@@ -559,7 +571,7 @@ export default function ProductsList() {
         </View>
         <View style={styles.headerActions}>
           {canCreate ? (
-            <Pressable onPress={() => router.push("/products/new" as never)} style={styles.headerAction} hitSlop={8} testID="button-new-article">
+            <Pressable onPress={() => router.push({ pathname: "/products/new", params: canCreateManufacturing ? { manufacturingRole } : {} } as never)} style={styles.headerAction} hitSlop={8} testID="button-new-article">
               <Feather name="plus-square" size={20} color={colors.text} />
             </Pressable>
           ) : null}
@@ -572,9 +584,25 @@ export default function ProductsList() {
         </View>
       </View>
 
+      {canViewManufacturing ? (
+        <View style={{ paddingHorizontal: 16, paddingBottom: 10, gap: 8 }}>
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            {(["raw_material", "finished_good"] as const).map((role) => (
+              <Button key={role}
+                label={role === "raw_material" ? t("Matières premières", "المواد الأولية") : t("Produits finis", "المنتجات الجاهزة")}
+                variant={manufacturingRole === role ? "primary" : "secondary"}
+                onPress={() => { setManufacturingRole(role); setPage(1); setSelectedIds([]); setListedProducts([]); }}
+                style={{ flex: 1 }}
+                testID={`products-role-${role}`}
+              />
+            ))}
+          </View>
+          <Button label={t("Ouvrir la production", "فتح قسم الإنتاج")} variant="secondary" onPress={() => router.push("/manufacturing" as never)} testID="products-open-production" />
+        </View>
+      ) : null}
       <View style={styles.searchRow}>
         <View style={styles.searchWrap}>
-         <SearchBar value={search} onChangeText={setSearch} placeholder={t("Nom, référence ou code-barres...", "الاسم أو المرجع أو الباركود...")} />
+         <SearchBar compact value={search} onChangeText={setSearch} placeholder={t("Nom, référence ou code-barres...", "الاسم أو المرجع أو الباركود...")} />
         </View>
         {!isMobileLayout ? (
           <Pressable onPress={() => setColumnsOpen(true)} style={styles.columnsButton} testID="button-open-article-columns">
@@ -681,7 +709,7 @@ export default function ProductsList() {
         />
       )}
 
-      {canCreate ? <Fab onPress={() => router.push("/products/new" as never)} testID="button-new-product" /> : null}
+      {canCreate ? <Fab onPress={() => router.push({ pathname: "/products/new", params: canCreateManufacturing ? { manufacturingRole } : {} } as never)} testID="button-new-product" /> : null}
 
       <SheetModal
         visible={columnsOpen}
@@ -1005,7 +1033,7 @@ function ArticleTable({
           )}
           onEndReached={onEndReached}
           onEndReachedThreshold={0.6}
-          ListFooterComponent={hasMore ? <View style={styles.tableFooter}><ActivityIndicator size="small" color={colors.primary} /></View> : null}
+          ListFooterComponent={hasMore ? <View style={styles.tableFooter}><ActivityIndicator size="small" color={colors.primary} /></View> : undefined}
         />
       </View>
     </ScrollView>
@@ -1055,7 +1083,7 @@ function MobileProductList({
       onEndReached={onEndReached}
       onEndReachedThreshold={0.6}
       ListEmptyComponent={<EmptyState title={emptyTitle} subtitle={emptySubtitle} />}
-      ListFooterComponent={hasMore ? <View style={styles.tableFooter}><ActivityIndicator size="small" color={colors.primary} /></View> : null}
+      ListFooterComponent={hasMore ? <View style={styles.tableFooter}><ActivityIndicator size="small" color={colors.primary} /></View> : undefined}
       renderItem={({ item }) => (
         <ArticleCard
           product={item}
@@ -1548,73 +1576,73 @@ function Metric({ label, value, tone = "default" }: { label: string; value: stri
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  header: { backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  header: { backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border, paddingHorizontal: 18, paddingTop: 14, paddingBottom: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   titleBlock: { flex: 1 },
   titleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   title: { color: colors.text, fontSize: 20, fontWeight: "800" },
   count: { color: colors.textMuted, fontSize: 12, marginTop: 3, marginLeft: 27 },
   headerActions: { flexDirection: "row", alignItems: "center", gap: 8 },
-  headerAction: { width: 34, height: 34, borderRadius: 9, alignItems: "center", justifyContent: "center" },
-  viewToggle: { width: 38, height: 34, borderRadius: 9, borderWidth: 1, borderColor: colors.primary, alignItems: "center", justifyContent: "center", backgroundColor: "#EEF3FA" },
+  headerAction: { width: 40, height: 40, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, alignItems: "center", justifyContent: "center" },
+  viewToggle: { width: 40, height: 40, borderRadius: 8, borderWidth: 1, borderColor: colors.accent, alignItems: "center", justifyContent: "center", backgroundColor: "#F1E9D6" },
   tabsScroll: { flexGrow: 0, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
-  tabsContent: { paddingHorizontal: 16, gap: 8, paddingVertical: 9 },
-  tab: { borderWidth: 1, borderColor: colors.border, borderRadius: 9, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: colors.surface },
-  tabActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  tabsContent: { paddingHorizontal: 16, gap: 8, paddingVertical: 10 },
+  tab: { minHeight: 40, borderWidth: 1, borderColor: colors.border, borderRadius: 7, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: colors.surface, justifyContent: "center" },
+  tabActive: { backgroundColor: "#F1E9D6", borderColor: colors.accent },
   tabText: { color: colors.textMuted, fontSize: 13, fontWeight: "600" },
-  tabTextActive: { color: "#fff" },
-  bulkBar: { minHeight: 46, marginHorizontal: 12, marginTop: 8, paddingHorizontal: 12, borderRadius: 10, backgroundColor: "#EEF3FA", flexDirection: "row", alignItems: "center", gap: 12 },
+  tabTextActive: { color: colors.primary },
+  bulkBar: { minHeight: 48, marginHorizontal: 12, marginTop: 8, paddingHorizontal: 12, borderRadius: 8, backgroundColor: "#F1E9D6", flexDirection: "row", alignItems: "center", gap: 12, borderWidth: 1, borderColor: "#E6D7B6" },
   bulkCount: { flex: 1, color: colors.primary, fontSize: 13, fontWeight: "800" },
   bulkAction: { minHeight: 32, paddingHorizontal: 8, flexDirection: "row", alignItems: "center", gap: 5 },
   bulkActionText: { color: colors.primary, fontSize: 12, fontWeight: "700" },
   searchRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingTop: 12 },
   searchWrap: { flex: 1 },
-  sortButton: { height: 45, minWidth: 68, paddingHorizontal: 9, borderRadius: 11, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 4 },
+  sortButton: { height: 45, minWidth: 60, paddingHorizontal: 8, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 4 },
   sortButtonText: { color: colors.primary, fontSize: 11, fontWeight: "700" },
-  filterButton: { width: 45, height: 45, borderRadius: 11, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" },
+  filterButton: { width: 45, height: 45, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" },
   filterButtonActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   filterBadge: { position: "absolute", right: -4, top: -5, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: colors.accent, alignItems: "center", justifyContent: "center", paddingHorizontal: 4 },
   filterBadgeText: { color: "#fff", fontSize: 10, fontWeight: "800" },
   quickFilters: { paddingHorizontal: 16, paddingVertical: 9, gap: 8 },
-  quickFilter: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 },
+  quickFilter: { minHeight: 38, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, borderRadius: 7, paddingHorizontal: 12, paddingVertical: 7, justifyContent: "center" },
   quickFilterText: { color: colors.text, fontSize: 12, fontWeight: "500" },
   listContent: { padding: 12, paddingBottom: 100 },
   mobileProductsContent: { padding: 12, paddingBottom: 110 },
   mobileProductsEmpty: { flexGrow: 1, padding: 24, paddingBottom: 110 },
   gridRow: { gap: 10, paddingHorizontal: 12 },
   gridItem: { flex: 1, maxWidth: "50%" },
-  articleCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 15, padding: 12, marginBottom: 10 },
+  articleCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderTopWidth: 2, borderTopColor: colors.accent, borderRadius: 10, padding: 14, marginBottom: 12 },
   articleCardCompact: { padding: 9, minHeight: 245 },
   cardTop: { flexDirection: "row", alignItems: "center", gap: 10 },
   cardTopCompact: { alignItems: "flex-start", flexDirection: "column" },
-  cardMoreButton: { width: 30, height: 34, alignItems: "center", justifyContent: "center" },
-  articleImage: { width: 68, height: 68, borderRadius: 10, backgroundColor: colors.background },
-  articleImageCompact: { width: "100%", height: 112, borderRadius: 10 },
+  cardMoreButton: { width: 40, height: 40, borderRadius: 7, backgroundColor: colors.background, alignItems: "center", justifyContent: "center" },
+  articleImage: { width: 64, height: 64, borderRadius: 8, backgroundColor: colors.background },
+  articleImageCompact: { width: "100%", height: 112, borderRadius: 8 },
   imagePlaceholder: { alignItems: "center", justifyContent: "center" },
   articleIdentity: { flex: 1, minWidth: 0 },
   articleName: { color: colors.text, fontSize: 15, fontWeight: "800" },
   articleSecondary: { color: colors.textMuted, fontSize: 11, marginTop: 4 },
   articleMeta: { color: colors.textMuted, fontSize: 11, marginTop: 3 },
-  metrics: { flexDirection: "row", borderTopWidth: 1, borderTopColor: colors.border, marginTop: 11, paddingTop: 10, gap: 8 },
-  metric: { flex: 1, minWidth: 0 },
-  metricLabel: { color: colors.textMuted, fontSize: 9, fontWeight: "700", marginBottom: 3 },
+  metrics: { flexDirection: "row", marginTop: 12, gap: 7 },
+  metric: { flex: 1, minWidth: 0, backgroundColor: colors.background, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 8 },
+  metricLabel: { color: colors.textMuted, fontSize: 9, fontWeight: "700", marginBottom: 4 },
   metricValue: { color: colors.text, fontSize: 12, fontWeight: "800" },
   metricDanger: { color: colors.danger },
   metricWarning: { color: colors.warning },
   metricSuccess: { color: colors.success },
-  detailLine: { flexDirection: "row", gap: 8, marginTop: 9, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.border },
+  detailLine: { flexDirection: "row", gap: 8, marginTop: 10, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.border },
   detailText: { flex: 1, color: colors.textMuted, fontSize: 10 },
   cardActions: { flexDirection: "row", gap: 7, marginTop: 10, paddingTop: 9, borderTopWidth: 1, borderTopColor: colors.border },
-  cardAction: { flex: 1, minHeight: 34, borderRadius: 8, backgroundColor: colors.background, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 5 },
-  deleteAction: { backgroundColor: "#FFF1F2" },
-  cardActionText: { color: colors.textMuted, fontSize: 11, fontWeight: "700" },
+  cardAction: { flex: 1, minHeight: 40, borderRadius: 7, backgroundColor: colors.background, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 5 },
+  deleteAction: { backgroundColor: "#F5E5E2" },
+  cardActionText: { color: colors.textMuted, fontSize: 12, fontWeight: "700" },
   refreshNotice: { flexDirection: "row", alignItems: "center", gap: 7, padding: 8, justifyContent: "center" },
   refreshText: { color: colors.textMuted, fontSize: 12 },
   errorState: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24, gap: 14 },
   filterFooter: { flexDirection: "row", gap: 10 },
   footerButton: { flex: 1 },
-  filterHint: { flexDirection: "row", alignItems: "center", gap: 8, padding: 10, borderRadius: 9, backgroundColor: "#EEF3FA", marginBottom: 14 },
+  filterHint: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderRadius: 7, backgroundColor: "#F1E9D6", marginBottom: 14 },
   filterHintText: { flex: 1, color: colors.primary, fontSize: 12 },
-  webOnlyNotice: { flexDirection: "row", alignItems: "flex-start", gap: 8, marginHorizontal: 12, marginTop: 10, padding: 10, borderRadius: 10, backgroundColor: "#EEF3FA" },
+  webOnlyNotice: { flexDirection: "row", alignItems: "flex-start", gap: 8, marginHorizontal: 12, marginTop: 10, padding: 11, borderRadius: 7, backgroundColor: "#F1E9D6" },
   webOnlyNoticeText: { flex: 1, color: colors.primary, fontSize: 12, lineHeight: 18 },
   filterSectionLabel: { color: colors.text, fontWeight: "800", fontSize: 13, marginTop: 4, marginBottom: 12 },
   columnsButton: { height: 45, paddingHorizontal: 11, borderRadius: 11, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 6 },
@@ -1627,7 +1655,7 @@ const styles = StyleSheet.create({
   columnsFooterText: { color: colors.primary, fontSize: 13, fontWeight: "700" },
   checkbox: { width: 21, height: 21, borderRadius: 4, borderWidth: 1, borderColor: colors.textMuted, alignItems: "center", justifyContent: "center" },
   checkboxChecked: { backgroundColor: colors.primary, borderColor: colors.primary },
-  tableOuter: { flex: 1, marginTop: 12, marginHorizontal: 12, borderWidth: 1, borderColor: colors.border, borderRadius: 14, backgroundColor: colors.surface },
+  tableOuter: { flex: 1, marginTop: 12, marginHorizontal: 12, borderWidth: 1, borderColor: colors.border, borderRadius: 8, backgroundColor: colors.surface, overflow: "hidden" },
   tableHeader: { height: 52, flexDirection: "row", alignItems: "center", borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: "#FAFBFC" },
   tableHeaderCell: { height: "100%", justifyContent: "center", paddingHorizontal: 10, borderLeftWidth: 1, borderLeftColor: colors.border },
   tableHeaderText: { color: colors.textMuted, fontSize: 12, fontWeight: "800" },
@@ -1672,11 +1700,11 @@ const styles = StyleSheet.create({
   detailTabTextActive: { color: colors.text, fontWeight: "800" },
   detailTabTextDisabled: { color: colors.textMuted },
   detailGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  detailField: { width: "48%", minHeight: 72, borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 12, backgroundColor: colors.surface },
+  detailField: { width: "48%", minHeight: 72, borderWidth: 1, borderColor: colors.border, borderRadius: 7, padding: 12, backgroundColor: colors.surface },
   detailFieldLabel: { color: colors.textMuted, fontSize: 12, marginBottom: 6 },
   detailFieldValue: { color: colors.text, fontSize: 14, fontWeight: "700", lineHeight: 19 },
   summaryGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  summaryCard: { width: "48%", minHeight: 116, borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 12, backgroundColor: colors.surface },
+  summaryCard: { width: "48%", minHeight: 116, borderWidth: 1, borderColor: colors.border, borderTopWidth: 2, borderTopColor: colors.accent, borderRadius: 8, padding: 12, backgroundColor: colors.surface },
   summaryCardLabel: { color: colors.textMuted, fontSize: 12, lineHeight: 17, marginTop: 8 },
   summaryCardValue: { color: colors.text, fontSize: 16, fontWeight: "800", marginTop: 6 },
   summaryStock: { width: "100%", borderWidth: 1, borderColor: colors.border, borderRadius: 10, padding: 14, marginTop: 2 },

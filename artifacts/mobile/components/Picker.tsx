@@ -108,7 +108,7 @@ export function PickerField<T>({
                   <Feather name="x-circle" size={18} color={colors.danger} />
                   <Text style={styles.clearText}>{t("Effacer la sélection", "مسح الاختيار")}</Text>
                 </Pressable>
-              ) : null
+              ) : undefined
             }
             renderItem={({ item }) => {
               const selected = value != null && keyExtractor(item) === keyExtractor(value);
@@ -148,6 +148,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 10,
+    minHeight: 48,
     paddingHorizontal: 12,
     paddingVertical: 12,
     backgroundColor: colors.surface,

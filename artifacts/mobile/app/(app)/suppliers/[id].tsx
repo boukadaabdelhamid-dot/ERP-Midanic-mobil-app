@@ -14,6 +14,7 @@ import { Card, Button, LoadingView, SectionTitle, Divider, ErrorState } from "@/
 import { colors } from "@/lib/colors";
 import { getContactBalance } from "@/lib/contact-balance";
 import { ContactHistoryRow } from "@/components/ContactHistoryRow";
+import { SupplierDirectionsButton } from "@/components/SupplierDirectionsButton";
 
 export default function SupplierDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -50,11 +51,34 @@ export default function SupplierDetail() {
         <Row label={t("Téléphone", "الهاتف")} value={supplier.phone ?? "—"} />
         <Row label={t("Email", "البريد الإلكتروني")} value={supplier.email ?? "—"} />
         <Row label={t("Adresse", "العنوان")} value={supplier.address ?? "—"} />
+        {typeof supplier.latitude === "number" && typeof supplier.longitude === "number" ? (
+          <>
+            <SupplierDirectionsButton latitude={supplier.latitude} longitude={supplier.longitude} />
+            {typeof supplier.locationAccuracyMeters === "number" ? (
+              <Row
+                label={t("Précision GPS", "دقة GPS")}
+                value={`± ${Math.round(supplier.locationAccuracyMeters)} m`}
+              />
+            ) : null}
+            {supplier.locationCapturedAt ? (
+              <Row
+                label={t("Position enregistrée", "وقت تسجيل الموقع")}
+                value={formatDateTime(supplier.locationCapturedAt, lang)}
+              />
+            ) : null}
+          </>
+        ) : (
+          <Text style={styles.muted}>
+            {t("Aucune position GPS enregistrée. Enregistrez-la depuis l’application mobile.", "لم يُحفظ موقع GPS بعد. سجّله من تطبيق الهاتف عند وجودك لدى المورد.")}
+          </Text>
+        )}
       </Card>
 
       {canEdit ? (
         <Button
-          label={t("Modifier le fournisseur", "تعديل المورد")}
+          label={typeof supplier.latitude === "number" && typeof supplier.longitude === "number"
+            ? t("Modifier le fournisseur", "تعديل المورد")
+            : t("Enregistrer la position GPS", "تسجيل موقع GPS")}
           variant="secondary"
           onPress={() => router.push(`/suppliers/${supplierId}/edit` as never)}
           testID="button-edit-supplier"
@@ -143,6 +167,12 @@ function formatDate(value: string | undefined, lang: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleDateString(lang === "ar" ? "ar-DZ" : "fr-FR");
+}
+
+function formatDateTime(value: string, lang: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString(lang === "ar" ? "ar-DZ" : "fr-FR");
 }
 
 function supplierOperationLabel(

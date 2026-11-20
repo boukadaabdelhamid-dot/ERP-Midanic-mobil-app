@@ -8,6 +8,7 @@ import { useApiFeedback } from "@/hooks/use-api-feedback";
 import { Screen } from "@/components/Screen";
 import { ErrorState } from "@/components/ui";
 import { SupplierForm, emptySupplierForm, type SupplierFormValues } from "@/components/SupplierForm";
+import { PURCHASE_FILTER_OPTIONS_QUERY_KEY, PURCHASES_NEEDED_QUERY_KEY } from "@/hooks/use-smart-purchase";
 
 export default function NewSupplier() {
   const { ready, isAdmin, can } = useProtectedRoute({ section: "suppliers" });
@@ -34,6 +35,14 @@ export default function NewSupplier() {
           email: values.email.trim() || undefined,
           phone: values.phone.trim() || undefined,
           address: values.address.trim() || undefined,
+          wilaya: values.wilaya.trim(),
+          commune: values.commune.trim(),
+          latitude: values.latitude,
+          longitude: values.longitude,
+          ...{
+            locationAccuracyMeters: values.locationAccuracyMeters,
+            locationCapturedAt: values.locationCapturedAt,
+          },
           notes: values.notes.trim() || undefined,
           contactType: values.contactType,
         },
@@ -42,6 +51,8 @@ export default function NewSupplier() {
         onSuccess: (supplier) => {
           feedback.success("Fournisseur créé", "تم إنشاء المورد");
           queryClient.invalidateQueries({ queryKey: getGetSuppliersQueryKey() });
+          queryClient.invalidateQueries({ queryKey: PURCHASE_FILTER_OPTIONS_QUERY_KEY });
+          queryClient.invalidateQueries({ queryKey: PURCHASES_NEEDED_QUERY_KEY });
           router.replace(`/suppliers/${supplier.id}` as never);
         },
         onError: (e) => feedback.error(e),

@@ -31,6 +31,6 @@ export default function SettingsLanguages() {
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 12 },
+  row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", minHeight: 48, paddingVertical: 12 },
   label: { fontSize: 15, color: colors.text },
 });

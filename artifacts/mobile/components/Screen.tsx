@@ -40,5 +40,5 @@ export function Screen({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: 16, paddingBottom: 40, gap: 12 },
+  content: { paddingHorizontal: 18, paddingTop: 18, paddingBottom: 40, gap: 14 },
 });

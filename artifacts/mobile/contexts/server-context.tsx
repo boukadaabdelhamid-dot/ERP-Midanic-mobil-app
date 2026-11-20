@@ -5,18 +5,17 @@ import {
   saveServerUrl,
   clearServerUrl as clearServerUrlStorage,
 } from "@/lib/server-storage";
-import { reconfigureApiClient } from "@/lib/api";
+import { ENV_API_URL, reconfigureApiClient } from "@/lib/api";
 
 /**
  * Manages the user-configured ERP server URL.
  *
- * If EXPO_PUBLIC_API_URL is set (dev/CI override), the stored URL is ignored
- * and `serverUrl` is always that env value. No setup screen is shown.
+ * If EXPO_PUBLIC_API_URL is set (explicit dev/CI override), the stored URL is
+ * ignored and `serverUrl` is always that env value. EXPO_PUBLIC_DOMAIN only
+ * supplies a development fallback; it does not lock the user to that server.
  */
 
-const ENV_URL = process.env.EXPO_PUBLIC_API_URL
-  ? process.env.EXPO_PUBLIC_API_URL.replace(/\/+$/, "")
-  : null;
+const ENV_URL = ENV_API_URL;
 
 type ServerContextType = {
   /** The active server URL, or null if not yet configured. */

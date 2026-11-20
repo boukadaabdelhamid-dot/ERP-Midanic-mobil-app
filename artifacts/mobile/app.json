@@ -3,7 +3,7 @@
     "name": "Midanic ERP",
     "slug": "midanic-erp",
     "scheme": "midanicerp",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "automatic",
@@ -22,11 +22,12 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#1B3057"
       },
-      "package": "com.midanic.erp"
+      "package": "com.midanic.erp",
+      "versionCode": 6
     },
     "web": {
       "bundler": "metro",
-      "output": "single",
+      "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
@@ -39,15 +40,28 @@
         }
       ],
       [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "يستخدم Midanic موقعك أثناء استخدام التطبيق لملء ولاية وبلدية المورد.",
+          "locationAlwaysAndWhenInUsePermission": false,
+          "locationAlwaysPermission": false,
+          "locationFullAccuracyPermission": false,
+          "isIosBackgroundLocationEnabled": false,
+          "isAndroidBackgroundLocationEnabled": false
+        }
+      ],
+      [
         "expo-local-authentication",
         {
           "faceIDPermission": "يستخدم Midanic Face ID لتسجيل الدخول بأمان"
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-sharing"
     ],
     "experiments": {
-      "typedRoutes": false
+      "typedRoutes": false,
+      "reactCompiler": false
     },
     "extra": {
       "router": {},

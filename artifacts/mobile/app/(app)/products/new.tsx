@@ -10,16 +10,24 @@ import { Screen } from "@/components/Screen";
 import { ErrorState } from "@/components/ui";
 import { ProductForm, emptyProductForm, productToForm, type ProductFormValues } from "@/components/ProductForm";
 import { moveProductImage, normalizeLocalImages, normalizeProductImages, uploadProductImage } from "@/lib/product-images";
+import { useCurrentStore } from "@/hooks/use-current-store";
+import { manufacturingQueryKeys } from "@workspace/api-client-react";
+import { canShowProductionClassification, productionProductFields } from "@/lib/production-products";
 
 export default function NewProduct() {
   const { ready, isAdmin, can } = useProtectedRoute({ section: "products" });
   const { t } = useLang();
+  const { isFactory } = useCurrentStore();
+  const canManageManufacturingRole = canShowProductionClassification(isFactory, isAdmin || can("manufacturing", "create"));
   const router = useRouter();
-  const { duplicateFrom } = useLocalSearchParams<{ duplicateFrom?: string }>();
+  const { duplicateFrom, manufacturingRole } = useLocalSearchParams<{ duplicateFrom?: string; manufacturingRole?: string }>();
   const queryClient = useQueryClient();
   const feedback = useApiFeedback();
 
-  const [values, setValues] = useState<ProductFormValues>(emptyProductForm());
+  const [values, setValues] = useState<ProductFormValues>(() => ({
+    ...emptyProductForm(),
+    manufacturingRole: manufacturingRole === "finished_good" ? "finished_good" : "raw_material",
+  }));
   const [images, setImages] = useState<ProductImage[]>([]);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [duplicateHydrated, setDuplicateHydrated] = useState(false);
@@ -64,7 +72,7 @@ export default function NewProduct() {
     const payload = {
       nameEn: values.nameEn.trim(),
       nameAr: values.nameAr.trim(),
-      price: normalizeDecimal(values.price),
+      ...productionProductFields(isFactory, values, canManageManufacturingRole),
       stock: parseNumber(values.stock) || 0,
       categoryId: values.categoryId,
       reference: values.reference.trim() || null,
@@ -92,7 +100,6 @@ export default function NewProduct() {
       colorId: values.colorId,
       minStock: values.minStock.trim() ? parseNumber(values.minStock) : null,
       isActive: values.isActive,
-      isExposed: values.isExposed,
       imageUrl: normalizedImages.find((image) => image.isPrimary)?.url ?? normalizedImages[0]?.url ?? null,
       images: normalizedImages.map((image, index) => ({
         url: image.url,
@@ -107,6 +114,8 @@ export default function NewProduct() {
         onSuccess: (product) => {
           feedback.success("Produit créé", "تم إنشاء المنتج");
           queryClient.invalidateQueries({ queryKey: getGetProductsQueryKey() });
+          queryClient.invalidateQueries({ queryKey: manufacturingQueryKeys.catalogue });
+          queryClient.invalidateQueries({ queryKey: manufacturingQueryKeys.replenishment });
           router.replace(`/products/${product.id}` as never);
         },
         onError: (e) => feedback.error(e),
@@ -199,6 +208,7 @@ export default function NewProduct() {
         uploadingImage={uploadingImage}
         onGenerateBarcode={handleGenerateBarcode}
         generatingBarcode={generateBarcode.isPending}
+        canManageManufacturingRole={canManageManufacturingRole}
       />
     </Screen>
   );

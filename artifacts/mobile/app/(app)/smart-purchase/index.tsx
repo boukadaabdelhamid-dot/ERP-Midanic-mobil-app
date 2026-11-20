@@ -7,26 +7,33 @@
  */
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
-  View, Text, StyleSheet, Pressable, Modal, ScrollView,
-  FlatList, Image, TextInput, ActivityIndicator, Share, Platform,
+  AppState, View, Text, StyleSheet, Pressable, Modal, ScrollView,
+  FlatList, Image, TextInput, ActivityIndicator, Share, Platform, Linking,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
+import * as Location from "expo-location";
 import { useProtectedRoute } from "@/hooks/use-protected-route";
 import { useLang } from "@/contexts/lang-context";
+import { useStoreContext } from "@/contexts/store-context";
 import { useApiFeedback } from "@/hooks/use-api-feedback";
 import { useConfirm } from "@/contexts/confirm-context";
 import { useMe } from "@/hooks/use-me";
 import { SearchBar } from "@/components/ListScreen";
 import { Button, LoadingView, EmptyState, ErrorState } from "@/components/ui";
 import { Fab } from "@/components/Fab";
+import { SupplierDirectionsButton } from "@/components/SupplierDirectionsButton";
+import { filterSuppliers, supplierSearchLocation } from "@/lib/supplier-search";
+import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { colors } from "@/lib/colors";
 import {
   useNeededProducts, useFilterOptions, usePurchaseHistory,
   useSnoozeProduct, useExcludeProduct, usePatchProductMinStock,
   useDraftPOs, useQuickOrder, useAddToPO, useSuppliersAll,
   usePurchaseSuggestions, useDeleteSuggestion, useTapSuggestion,
-  type NeededRow, type NeededFilters, type DraftPO, type PurchaseSuggestion,
+  type NeededRow, type NeededSupplier, type NeededFilters, type DraftPO, type PurchaseSuggestion,
+  type DeviceCoordinates, formatSupplierDistance, getSupplierDistanceKm,
+  hasValidSupplierCoordinates, sortSuppliersByDistance,
 } from "@/hooks/use-smart-purchase";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -35,6 +42,33 @@ function fmtNum(n: number | string | null | undefined): string {
   if (n == null || n === "") return "—";
   const v = Number(n);
   return isNaN(v) ? "—" : v.toLocaleString("fr-DZ", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+function getProductSuppliers(row: NeededRow): NeededSupplier[] {
+  const byId = new Map<number, NeededSupplier>();
+  for (const supplier of Array.isArray(row.suppliers) ? row.suppliers : []) {
+    if (!supplier || !Number.isFinite(supplier.id) || byId.has(supplier.id)) continue;
+    byId.set(supplier.id, supplier);
+  }
+  if (row.supplier_id != null && row.supplier_name && !byId.has(row.supplier_id)) {
+    byId.set(row.supplier_id, {
+      id: row.supplier_id,
+      name: row.supplier_name,
+      city: row.supplier_city,
+      wilaya: null,
+      commune: null,
+      phone: row.supplier_phone,
+      latitude: null,
+      longitude: null,
+    });
+  }
+  return [...byId.values()];
+}
+
+function supplierLocationLabel(supplier: NeededSupplier): string | null {
+  const parts = [supplier.commune?.trim() || supplier.city?.trim(), supplier.wilaya?.trim()]
+    .filter((part): part is string => !!part);
+  return [...new Map(parts.map((part) => [part.toLocaleLowerCase(), part])).values()].join(" · ") || null;
 }
 
 function localDateStr(d: Date): string {
@@ -252,6 +286,7 @@ function QuickOrderSheet({
 
   const [mode, setMode]             = useState<"new" | "existing">("new");
   const [supplierId, setSupplierId] = useState("");
+  const [supplierSearch, setSupplierSearch] = useState("");
   const [selectedPoId, setSelectedPoId] = useState("");
   const [quantity, setQuantity]     = useState("1");
   const [unitCost, setUnitCost]     = useState("");
@@ -262,7 +297,10 @@ function QuickOrderSheet({
 
   const open = product != null;
 
-  const { data: suppliers = [] } = useSuppliersAll(open);
+  const {
+    data: suppliers = [], isPending: suppliersLoading, isError: suppliersFailed,
+    refetch: reloadSuppliers,
+  } = useSuppliersAll(open);
 
   const { data: draftPOs = [] } = useDraftPOs(open);
   const { data: history } = usePurchaseHistory(product?.id ?? null, open);
@@ -282,6 +320,7 @@ function QuickOrderSheet({
     setError("");
     setMode("new");
     setSelectedPoId("");
+    setSupplierSearch("");
   }, [product?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Apply last real purchase price from history once loaded
@@ -294,6 +333,9 @@ function QuickOrderSheet({
     const preferred = product?.supplier_id ?? null;
     return [...draftPOs].sort((a, b) => (a.supplierId === preferred ? 0 : 1) - (b.supplierId === preferred ? 0 : 1));
   }, [draftPOs, product?.supplier_id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const filteredSuppliers = useMemo(() => filterSuppliers(suppliers, supplierSearch), [suppliers, supplierSearch]);
+  const selectedSupplierName = suppliers.find((supplier) => String(supplier.id) === supplierId)?.name
+    ?? (supplierId === String(product?.supplier_id) ? product?.supplier_name : null);
 
   const minQty = product
     ? Math.max(1, (product.min_stock ?? 0) - product.stock)
@@ -353,7 +395,7 @@ function QuickOrderSheet({
             <Pressable onPress={onClose} hitSlop={12}><Feather name="x" size={22} color={colors.text} /></Pressable>
           </View>
 
-          <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 14 }} keyboardShouldPersistTaps="handled">
+          <KeyboardAwareScrollViewCompat contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 14 }} keyboardShouldPersistTaps="handled" bottomOffset={30}>
             {success ? (
               /* ── Success ── */
               <View style={qo.successBox}>
@@ -394,17 +436,51 @@ function QuickOrderSheet({
                 {mode === "new" ? (
                   <View>
                     <Text style={qo.label}>{t("Fournisseur *", "المورد *")}</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-                      {suppliers.map((s) => (
+                    <TextInput
+                      style={qo.supplierSearch}
+                      value={supplierSearch}
+                      onChangeText={setSupplierSearch}
+                      placeholder={t("Nom, wilaya, commune ou adresse", "الاسم أو الولاية أو البلدية أو العنوان")}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      accessibilityLabel={t("Rechercher un fournisseur par nom ou lieu", "ابحث عن المورد بالاسم أو الموقع")}
+                      clearButtonMode="while-editing"
+                      testID="input-quick-order-supplier-search"
+                    />
+                    {selectedSupplierName ? (
+                      <Text style={qo.hint} testID="quick-order-selected-supplier">
+                        {t("Fournisseur sélectionné", "المورد المحدد")}: {selectedSupplierName}
+                      </Text>
+                    ) : null}
+                    {suppliersLoading ? <ActivityIndicator color={colors.primary} /> : null}
+                    {suppliersFailed ? (
+                      <Pressable onPress={() => reloadSuppliers()} accessibilityRole="button" testID="button-retry-quick-order-suppliers">
+                        <Text style={qo.error}>{t("Chargement impossible. Réessayer", "تعذر تحميل الموردين. أعد المحاولة")}</Text>
+                      </Pressable>
+                    ) : null}
+                    <ScrollView horizontal keyboardShouldPersistTaps="handled" showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                      {filteredSuppliers.map((s) => (
                         <Pressable key={s.id}
                           onPress={() => setSupplierId(String(s.id))}
+                          accessibilityRole="radio"
+                          accessibilityState={{ selected: supplierId === String(s.id) }}
+                          accessibilityLabel={[s.name, supplierSearchLocation(s)].filter(Boolean).join(" · ")}
+                          testID={`quick-order-supplier-${s.id}`}
                           style={[qo.supplierPill, supplierId === String(s.id) && qo.supplierPillActive]}>
                           <Text style={[qo.supplierPillTxt, supplierId === String(s.id) && qo.supplierPillTxtActive]}
                             numberOfLines={1}>
                             {supplierId === String(s.id) && <Feather name="check" size={11} />} {s.name}
                           </Text>
+                          {supplierSearchLocation(s) ? (
+                            <Text style={[qo.supplierLocation, supplierId === String(s.id) && qo.supplierPillTxtActive]} numberOfLines={1}>
+                              {supplierSearchLocation(s)}
+                            </Text>
+                          ) : null}
                         </Pressable>
                       ))}
+                      {!suppliersLoading && !suppliersFailed && filteredSuppliers.length === 0 ? (
+                        <Text style={qo.hint}>{t("Aucun fournisseur correspondant", "لا يوجد مورد مطابق")}</Text>
+                      ) : null}
                     </ScrollView>
                   </View>
                 ) : (
@@ -497,7 +573,7 @@ function QuickOrderSheet({
                 />
               </>
             )}
-          </ScrollView>
+          </KeyboardAwareScrollViewCompat>
         </View>
       </View>
     </Modal>
@@ -522,8 +598,10 @@ const qo = StyleSheet.create({
   modeTxt: { fontSize: 13, fontWeight: "600", color: colors.text },
   modeTxtActive: { color: "#fff" },
   supplierPill: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
+  supplierSearch: { height: 40, borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 10, color: colors.text, marginBottom: 7 },
   supplierPillActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   supplierPillTxt: { fontSize: 13, color: colors.text, maxWidth: 120 },
+  supplierLocation: { fontSize: 11, color: colors.textMuted, maxWidth: 160, marginTop: 3 },
   supplierPillTxtActive: { color: "#fff" },
   draftRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: colors.border, marginBottom: 6, backgroundColor: colors.background },
   draftRowActive: { borderColor: colors.primary, backgroundColor: "#eff6ff" },
@@ -550,19 +628,109 @@ type ActiveFilters = {
   familyName: string | null;
   brandId: number | null;
   brandName: string | null;
-  supplierCity: string | null;
+  supplierWilaya: string | null;
+  supplierCommune: string | null;
   dateFrom: string | null;
   dateTo: string | null;
   datePreset: DatePreset | null;
 };
 
+const UNASSIGNED_WILAYA_FILTER = "__unassigned_wilaya__";
+
 const DEFAULT_FILTERS: ActiveFilters = {
   supplierId: null, supplierName: null,
   familyId: null,   familyName: null,
   brandId: null,    brandName: null,
-  supplierCity: null,
+  supplierWilaya: null, supplierCommune: null,
   dateFrom: null, dateTo: null, datePreset: null,
 };
+
+type LocationOption = { value: string; label: string };
+
+function locationSelectOptions(values: Array<string | null | undefined>): LocationOption[] {
+  const unique = new Map<string, string>();
+  for (const rawValue of values) {
+    const value = rawValue?.trim();
+    if (!value) continue;
+    const key = value.toLocaleLowerCase();
+    if (!unique.has(key)) unique.set(key, value);
+  }
+  return [...unique.values()]
+    .sort((a, b) => a.localeCompare(b))
+    .map((value) => ({ value, label: value }));
+}
+
+function LocationPickerModal({
+  visible, title, allLabel, options, value, onSelect, onClose,
+}: {
+  visible: boolean;
+  title: string;
+  allLabel: string;
+  options: LocationOption[];
+  value: string | null;
+  onSelect: (value: string | null) => void;
+  onClose: () => void;
+}) {
+  const { t } = useLang();
+  const [search, setSearch] = useState("");
+  useEffect(() => {
+    if (!visible) setSearch("");
+  }, [visible]);
+
+  const normalizedSearch = search.trim().toLocaleLowerCase();
+  const filteredOptions = options.filter((option) =>
+    !normalizedSearch || option.label.toLocaleLowerCase().includes(normalizedSearch),
+  );
+  const rows: Array<{ value: string | null; label: string }> = [
+    { value: null, label: allLabel },
+    ...filteredOptions,
+  ];
+
+  if (!visible) return null;
+
+  return (
+    <View style={lp.overlay}>
+      <View style={lp.sheet}>
+          <View style={lp.header}>
+            <Text style={lp.title}>{title}</Text>
+            <Pressable onPress={onClose} hitSlop={12} style={lp.closeButton}>
+              <Feather name="x" size={20} color={colors.text} />
+            </Pressable>
+          </View>
+          <View style={lp.search}>
+            <Feather name="search" size={16} color={colors.textMuted} />
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder={t("Rechercher…", "بحث…")}
+              placeholderTextColor={colors.textMuted}
+              style={lp.searchInput}
+              autoCorrect={false}
+            />
+          </View>
+          <FlatList
+            data={rows}
+            keyExtractor={(item) => item.value ?? "__all__"}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item }) => (
+              <Pressable
+                onPress={() => { onSelect(item.value); onClose(); }}
+                style={[lp.option, value === item.value && lp.optionSelected]}
+              >
+                <Text style={[lp.optionText, value === item.value && lp.optionTextSelected]}>
+                  {item.label}
+                </Text>
+                {value === item.value ? <Feather name="check" size={17} color={colors.primary} /> : null}
+              </Pressable>
+            )}
+            ListEmptyComponent={
+              <Text style={lp.empty}>{t("Aucun résultat", "لا توجد نتائج")}</Text>
+            }
+          />
+      </View>
+    </View>
+  );
+}
 
 function FilterModal({
   visible, onClose, filters, onApply, enabled, suppliers,
@@ -572,15 +740,46 @@ function FilterModal({
   suppliers: { id: number; name: string }[];
 }) {
   const { t, lang } = useLang();
+  const { currentStoreId } = useStoreContext();
   const [local, setLocal] = useState<ActiveFilters>(filters);
+  const [locationPicker, setLocationPicker] = useState<"wilaya" | "commune" | null>(null);
   const {
     data: opts,
     isLoading: optionsLoading,
     isError: optionsError,
     refetch: refetchOptions,
-  } = useFilterOptions(enabled && visible);
+  } = useFilterOptions(enabled && visible, currentStoreId);
 
-  useEffect(() => { if (visible) setLocal(filters); }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (visible) setLocal(filters);
+    setLocationPicker(null);
+  }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const wilayaOptions = useMemo(() => {
+    const options = locationSelectOptions((opts?.supplierLocations ?? []).map((location) => location.wilaya));
+    if (opts?.supplierLocations?.some((location) => !location.wilaya?.trim())) {
+      options.unshift({
+        value: UNASSIGNED_WILAYA_FILTER,
+        label: t("Wilaya non précisée", "ولاية غير محددة"),
+      });
+    }
+    return options;
+  }, [opts, t]);
+
+  const communeOptions = useMemo(() => {
+    const wilaya = local.supplierWilaya;
+    if (!wilaya) return [];
+    const locations = opts?.supplierLocations ?? [];
+    const withinWilaya = locations.filter((location) =>
+      wilaya === UNASSIGNED_WILAYA_FILTER
+        ? !location.wilaya?.trim()
+        : location.wilaya?.trim().toLocaleLowerCase() === wilaya.trim().toLocaleLowerCase(),
+    );
+    return locationSelectOptions(withinWilaya.map((location) => location.commune));
+  }, [opts, local.supplierWilaya]);
+
+  const selectedWilaya = wilayaOptions.find((option) => option.value === local.supplierWilaya)?.label;
+  const selectedCommune = communeOptions.find((option) => option.value === local.supplierCommune)?.label;
 
   function applyDatePreset(preset: DatePreset) {
     const { from, to } = getDateRange(preset);
@@ -684,24 +883,41 @@ function FilterModal({
               </>
             ) : null}
 
-            {/* Supplier city */}
-            {opts?.supplierCities?.length ? (
-              <>
-                <Text style={fm.sectionLabel}>{t("Ville fournisseur", "مدينة المورد")}</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-                  <Pressable onPress={() => setLocal((p) => ({ ...p, supplierCity: null }))}
-                    style={[fm.pill, !local.supplierCity && fm.pillOn]}>
-                    <Text style={[fm.pillTxt, !local.supplierCity && fm.pillTxtOn]}>{t("Tout", "الكل")}</Text>
+            {/* Supplier location */}
+            <View style={fm.locationSection}>
+              <Text style={fm.sectionLabel}>{t("Localisation du fournisseur", "موقع المورد")}</Text>
+              <View style={fm.locationFields}>
+                <View style={fm.locationField}>
+                  <Text style={fm.locationLabel}>{t("Wilaya", "الولاية")}</Text>
+                  <Pressable
+                    onPress={() => setLocationPicker("wilaya")}
+                    style={fm.locationButton}
+                    testID="filter-supplier-wilaya"
+                  >
+                    <Text style={[fm.locationValue, !selectedWilaya && fm.locationPlaceholder]} numberOfLines={1}>
+                      {selectedWilaya ?? local.supplierWilaya ?? t("Toutes les wilayas", "كل الولايات")}
+                    </Text>
+                    <Feather name="chevron-down" size={16} color={colors.textMuted} />
                   </Pressable>
-                  {opts.supplierCities.map((c) => (
-                    <Pressable key={c} onPress={() => setLocal((p) => ({ ...p, supplierCity: c }))}
-                      style={[fm.pill, local.supplierCity === c && fm.pillOn]}>
-                      <Text style={[fm.pillTxt, local.supplierCity === c && fm.pillTxtOn]}>{c}</Text>
-                    </Pressable>
-                  ))}
-                </ScrollView>
-              </>
-            ) : null}
+                </View>
+                <View style={fm.locationField}>
+                  <Text style={fm.locationLabel}>{t("Commune", "البلدية")}</Text>
+                  <Pressable
+                    onPress={() => setLocationPicker("commune")}
+                    disabled={!local.supplierWilaya}
+                    style={[fm.locationButton, !local.supplierWilaya && fm.locationDisabled]}
+                    testID="filter-supplier-commune"
+                  >
+                    <Text style={[fm.locationValue, !selectedCommune && fm.locationPlaceholder]} numberOfLines={1}>
+                      {selectedCommune ?? (local.supplierWilaya
+                        ? t("Toutes les communes", "كل البلديات")
+                        : t("Choisir la wilaya d'abord", "اختر الولاية أولاً"))}
+                    </Text>
+                    <Feather name="chevron-down" size={16} color={colors.textMuted} />
+                  </Pressable>
+                </View>
+              </View>
+            </View>
 
             {/* Date range */}
             <Text style={fm.sectionLabel}>{t("Période des ventes", "فترة المبيعات")}</Text>
@@ -734,10 +950,36 @@ function FilterModal({
             <Button label={t("Appliquer", "تطبيق")} onPress={apply} style={{ flex: 2 }} />
           </View>
         </View>
+        <LocationPickerModal
+          visible={visible && locationPicker != null}
+          title={locationPicker === "commune" ? t("Choisir une commune", "اختر البلدية") : t("Choisir une wilaya", "اختر الولاية")}
+          allLabel={locationPicker === "commune" ? t("Toutes les communes", "كل البلديات") : t("Toutes les wilayas", "كل الولايات")}
+          options={locationPicker === "commune" ? communeOptions : wilayaOptions}
+          value={locationPicker === "commune" ? local.supplierCommune : local.supplierWilaya}
+          onSelect={(value) => setLocal((current) => locationPicker === "commune"
+            ? { ...current, supplierCommune: value }
+            : { ...current, supplierWilaya: value, supplierCommune: null })}
+          onClose={() => setLocationPicker(null)}
+        />
       </View>
     </Modal>
   );
 }
+
+const lp = StyleSheet.create({
+  overlay: { ...StyleSheet.absoluteFill, zIndex: 10, backgroundColor: "rgba(11, 25, 48, 0.45)", justifyContent: "flex-end" },
+  sheet: { height: "82%", backgroundColor: colors.surface, borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden" },
+  header: { minHeight: 58, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 18, borderBottomWidth: 1, borderBottomColor: colors.border },
+  title: { fontSize: 16, fontWeight: "800", color: colors.text },
+  closeButton: { width: 40, height: 40, borderRadius: 8, backgroundColor: colors.background, alignItems: "center", justifyContent: "center" },
+  search: { minHeight: 46, flexDirection: "row", alignItems: "center", gap: 8, margin: 14, paddingHorizontal: 12, borderWidth: 1, borderColor: colors.border, borderRadius: 8, backgroundColor: colors.surface },
+  searchInput: { flex: 1, height: 44, color: colors.text, fontSize: 14 },
+  option: { minHeight: 50, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 18, borderBottomWidth: 1, borderBottomColor: colors.border },
+  optionSelected: { backgroundColor: "#F1E9D6" },
+  optionText: { flex: 1, fontSize: 14, color: colors.text },
+  optionTextSelected: { color: colors.primary, fontWeight: "700" },
+  empty: { padding: 24, textAlign: "center", color: colors.textMuted, fontSize: 13 },
+});
 
 const fm = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
@@ -754,6 +996,14 @@ const fm = StyleSheet.create({
   title: { fontSize: 17, fontWeight: "700", color: colors.text },
   footer: { flexDirection: "row", gap: 10, padding: 16, borderTopWidth: 1, borderTopColor: colors.border },
   sectionLabel: { fontSize: 12, fontWeight: "700", color: colors.textMuted, textTransform: "uppercase", letterSpacing: 0.5 },
+  locationSection: { gap: 8 },
+  locationFields: { flexDirection: "row", gap: 10 },
+  locationField: { flex: 1, gap: 5 },
+  locationLabel: { fontSize: 11, fontWeight: "700", color: colors.textMuted },
+  locationButton: { minHeight: 46, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 6, paddingHorizontal: 11, borderWidth: 1, borderColor: colors.border, borderRadius: 8, backgroundColor: colors.surface },
+  locationValue: { flex: 1, fontSize: 12, fontWeight: "600", color: colors.text },
+  locationPlaceholder: { color: colors.textMuted, fontWeight: "500" },
+  locationDisabled: { opacity: 0.55, backgroundColor: colors.background },
   pill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
   pillOn: { backgroundColor: colors.primary, borderColor: colors.primary },
   pillTxt: { fontSize: 13, color: colors.text, fontWeight: "500" },
@@ -770,11 +1020,12 @@ const fm = StyleSheet.create({
 // ─── ProductCard ──────────────────────────────────────────────────────────────
 
 function ProductCard({
-  row, sortBy, compact = false, onHistory, onOrder, onSnooze, onExclude,
+  row, sortBy, compact = false, originCoordinates, onHistory, onOrder, onSnooze, onExclude,
 }: {
   row: NeededRow;
   sortBy: "profit" | "qty_sold";
   compact?: boolean;
+  originCoordinates: DeviceCoordinates | null;
   onHistory: () => void;
   onOrder: () => void;
   onSnooze: () => void;
@@ -783,6 +1034,7 @@ function ProductCard({
   const { t, lang } = useLang();
   const name = lang === "ar" && row.designation_ar ? row.designation_ar : row.designation;
   const suggestedQty = row.min_stock != null ? Math.max(1, row.min_stock - row.stock) : null;
+  const suppliers = sortSuppliersByDistance(getProductSuppliers(row), originCoordinates);
 
   return (
     <View style={[pc.card, compact && pc.cardCompact]}>
@@ -840,16 +1092,108 @@ function ProductCard({
         </View>
       ) : null}
 
-      {/* Supplier */}
-      {row.supplier_name ? (
-        <View style={pc.supplierRow}>
-          <Feather name="truck" size={11} color={colors.textMuted} />
-          <Text style={pc.supplierTxt} numberOfLines={1}>
-            {[row.supplier_name, row.supplier_city].filter(Boolean).join(" · ")}
-          </Text>
-          {row.supplier_phone ? (
-            <Text style={pc.supplierPhone}>{row.supplier_phone}</Text>
-          ) : null}
+      {/* Historical suppliers, already ordered newest first by the API. */}
+      {suppliers.length ? (
+        <View style={pc.suppliersSection} testID={`product-suppliers-${row.id}`}>
+          <View style={pc.suppliersHeading}>
+            <Feather name="truck" size={12} color={colors.textMuted} />
+            <Text style={pc.suppliersHeadingText}>
+              {t("Fournisseurs historiques", "الموردون من سجل الشراء")} · {suppliers.length}
+            </Text>
+          </View>
+          {suppliers.map((supplier) => {
+            const location = supplierLocationLabel(supplier);
+            const distance = getSupplierDistanceKm(supplier, originCoordinates);
+            const gpsAccuracy = typeof supplier.location_accuracy_meters === "number"
+              && Number.isFinite(supplier.location_accuracy_meters)
+              && supplier.location_accuracy_meters >= 0
+              ? Math.round(supplier.location_accuracy_meters)
+              : null;
+            const gpsCapturedAt = supplier.location_captured_at
+              && !Number.isNaN(Date.parse(supplier.location_captured_at))
+              ? new Date(supplier.location_captured_at)
+              : null;
+            return (
+              <View key={supplier.id} style={[pc.supplierEntry, compact && pc.supplierEntryCompact]}>
+                <Text style={[pc.supplierName, compact && pc.supplierNameCompact]} numberOfLines={2}>
+                  {supplier.name}
+                </Text>
+                <View style={pc.supplierMeta} testID={`supplier-last-purchase-${row.id}-${supplier.id}`}>
+                  <Feather name="tag" size={11} color={colors.textMuted} />
+                  <Text style={[pc.supplierMetaText, compact && pc.supplierMetaCompact]}>
+                    {t("Dernier prix d’achat", "آخر سعر شراء")}: {supplier.last_unit_cost != null
+                      && String(supplier.last_unit_cost).trim() !== ""
+                      && Number.isFinite(Number(supplier.last_unit_cost))
+                        ? `${fmtNum(supplier.last_unit_cost)} ${lang === "ar" ? "دج" : "DA"}`
+                        : t("Non disponible", "غير متوفر")}
+                  </Text>
+                </View>
+                {supplier.last_purchase_date && !Number.isNaN(Date.parse(supplier.last_purchase_date)) ? (
+                  <View style={pc.supplierMeta}>
+                    <Feather name="calendar" size={11} color={colors.textMuted} />
+                    <Text style={[pc.supplierMetaText, compact && pc.supplierMetaCompact]}>
+                      {t("Dernier achat", "آخر شراء")}: {new Date(supplier.last_purchase_date).toLocaleDateString(lang === "ar" ? "ar-DZ" : "fr-DZ")}
+                    </Text>
+                  </View>
+                ) : null}
+                {hasValidSupplierCoordinates(supplier) ? (
+                  <View style={pc.supplierRouteRow}>
+                    <SupplierDirectionsButton
+                      latitude={supplier.latitude}
+                      longitude={supplier.longitude}
+                      compact
+                      testID={`button-supplier-directions-${row.id}-${supplier.id}`}
+                    />
+                    {distance != null ? (
+                      <Text style={[pc.supplierDistance, compact && pc.supplierMetaCompact]}>
+                        ≈ {formatSupplierDistance(distance, lang)}
+                      </Text>
+                    ) : null}
+                  </View>
+                ) : (
+                  <Text style={pc.supplierNoGps}>
+                    {t("GPS non enregistré", "لم يُحفظ GPS")}
+                  </Text>
+                )}
+                {hasValidSupplierCoordinates(supplier) && (gpsAccuracy != null || gpsCapturedAt) ? (
+                  <View style={pc.supplierGpsQuality} testID={`supplier-gps-quality-${row.id}-${supplier.id}`}>
+                    {gpsAccuracy != null ? (
+                      <View style={pc.supplierMeta}>
+                        <Feather name="crosshair" size={11} color={colors.textMuted} />
+                        <Text style={[pc.supplierMetaText, compact && pc.supplierMetaCompact]}>
+                          {t("Précision GPS", "دقة GPS")}: ± {gpsAccuracy} m
+                        </Text>
+                      </View>
+                    ) : null}
+                    {gpsCapturedAt ? (
+                      <View style={pc.supplierMeta}>
+                        <Feather name="clock" size={11} color={colors.textMuted} />
+                        <Text style={[pc.supplierMetaText, compact && pc.supplierMetaCompact]}>
+                          {t("Position relevée", "وقت التقاط الموقع")}: {gpsCapturedAt.toLocaleString(lang === "ar" ? "ar-DZ" : "fr-DZ")}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+                ) : null}
+                {location ? (
+                  <View style={pc.supplierMeta}>
+                    <Feather name="map-pin" size={11} color={colors.textMuted} />
+                    <Text style={[pc.supplierMetaText, compact && pc.supplierMetaCompact]} numberOfLines={2}>
+                      {location}
+                    </Text>
+                  </View>
+                ) : null}
+                {supplier.phone?.trim() ? (
+                  <View style={pc.supplierMeta}>
+                    <Feather name="phone" size={11} color={colors.textMuted} />
+                    <Text style={[pc.supplierMetaText, compact && pc.supplierMetaCompact]}>
+                      {supplier.phone}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+            );
+          })}
         </View>
       ) : null}
 
@@ -894,9 +1238,20 @@ const pc = StyleSheet.create({
   priceRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: colors.background, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5 },
   priceLabel: { fontSize: 11, color: colors.textMuted },
   priceValue: { fontSize: 12, color: colors.primary, fontWeight: "700" },
-  supplierRow: { flexDirection: "row", alignItems: "center", gap: 5, flexWrap: "wrap" },
-  supplierTxt: { fontSize: 11, color: "#1d4ed8", flex: 1 },
-  supplierPhone: { fontSize: 11, color: colors.textMuted },
+  suppliersSection: { gap: 6 },
+  suppliersHeading: { flexDirection: "row", alignItems: "center", gap: 5 },
+  suppliersHeadingText: { color: colors.textMuted, fontSize: 10, fontWeight: "700" },
+  supplierEntry: { gap: 3, padding: 8, borderRadius: 7, backgroundColor: colors.background },
+  supplierEntryCompact: { padding: 6 },
+  supplierName: { color: colors.primary, fontSize: 12, fontWeight: "700" },
+  supplierNoGps: { color: colors.textMuted, fontSize: 10 },
+  supplierNameCompact: { fontSize: 11 },
+  supplierRouteRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
+  supplierGpsQuality: { gap: 2 },
+  supplierDistance: { color: colors.info, fontSize: 10, fontWeight: "700" },
+  supplierMeta: { flexDirection: "row", alignItems: "center", gap: 5 },
+  supplierMetaText: { flex: 1, color: colors.textMuted, fontSize: 11 },
+  supplierMetaCompact: { fontSize: 10 },
   actions: { flexDirection: "row", gap: 6, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.border, alignItems: "center" },
   actionsCompact: { flexWrap: "wrap" },
   actionBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background },
@@ -998,6 +1353,10 @@ export default function SmartPurchase() {
   const [filterOpen, setFilterOpen]   = useState(false);
   const [hiddenIds, setHiddenIds]     = useState<Set<number>>(new Set());
   const [viewMode, setViewMode]       = useState<"list" | "grid">("list");
+  const [originCoordinates, setOriginCoordinates] = useState<DeviceCoordinates | null>(null);
+  const [isLocating, setIsLocating] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [locationPermissionBlocked, setLocationPermissionBlocked] = useState(false);
 
   // ── Sheets ──
   const [historyProduct, setHistoryProduct] = useState<NeededRow | null>(null);
@@ -1008,6 +1367,113 @@ export default function SmartPurchase() {
 
   const isIdees = activeTab === "idees";
 
+  useEffect(() => {
+    if (Platform.OS === "web" || !locationPermissionBlocked) return;
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        void Location.getForegroundPermissionsAsync()
+          .then((permission) => {
+            setLocationPermissionBlocked(permission.status === "denied" && !permission.canAskAgain);
+          })
+          .catch(() => {});
+      }
+    });
+    return () => subscription.remove();
+  }, [locationPermissionBlocked]);
+
+  async function openLocationSettings() {
+    try {
+      await Linking.openSettings();
+    } catch {
+      setLocationError(t(
+        "Ouvrez les réglages du téléphone pour autoriser la localisation.",
+        "افتح إعدادات الهاتف للسماح باستخدام الموقع.",
+      ));
+    }
+  }
+
+  async function useCurrentLocation() {
+    setLocationError(null);
+    setIsLocating(true);
+    try {
+      let coordinates: DeviceCoordinates;
+      if (Platform.OS === "web") {
+        coordinates = await new Promise<DeviceCoordinates>((resolve, reject) => {
+          if (typeof navigator === "undefined" || !navigator.geolocation) {
+            reject(new Error("unavailable"));
+            return;
+          }
+          navigator.geolocation.getCurrentPosition(
+            ({ coords }) => resolve({ latitude: coords.latitude, longitude: coords.longitude }),
+            (error) => reject(new Error(error.code === 1 ? "permission-denied" : "position-unavailable")),
+            { enableHighAccuracy: true, timeout: 20_000, maximumAge: 0 },
+          );
+        });
+      } else {
+        const permission = await Location.requestForegroundPermissionsAsync();
+        if (!permission.granted) {
+          setLocationPermissionBlocked(permission.status === "denied" && !permission.canAskAgain);
+          setLocationError(t(
+            permission.canAskAgain === false
+              ? "Autorisation refusée. Ouvrez les réglages du téléphone pour autoriser la localisation."
+              : "Autorisez la localisation pour trier les fournisseurs par proximité.",
+            permission.canAskAgain === false
+              ? "تم رفض الإذن. افتح إعدادات الهاتف للسماح باستخدام الموقع."
+              : "اسمح بالوصول إلى الموقع لترتيب الموردين حسب القرب.",
+          ));
+          return;
+        }
+        setLocationPermissionBlocked(false);
+        if (!(await Location.hasServicesEnabledAsync())) {
+          if (Platform.OS === "android") {
+            await Location.enableNetworkProviderAsync();
+          } else {
+            setLocationError(t(
+              "Activez le service de localisation dans les réglages du téléphone.",
+              "فعّل خدمة الموقع من إعدادات الهاتف.",
+            ));
+            return;
+          }
+        }
+        const position = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        coordinates = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        };
+      }
+
+      if (
+        !Number.isFinite(coordinates.latitude)
+        || !Number.isFinite(coordinates.longitude)
+        || coordinates.latitude < -90
+        || coordinates.latitude > 90
+        || coordinates.longitude < -180
+        || coordinates.longitude > 180
+      ) {
+        throw new Error("position-unavailable");
+      }
+      setOriginCoordinates(coordinates);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "";
+      setLocationError(t(
+        reason === "unavailable"
+          ? "La localisation n'est pas disponible sur cet appareil."
+          : reason === "permission-denied"
+            ? "Autorisez la localisation dans les réglages du navigateur."
+            : "Position indisponible. Vérifiez le GPS et réessayez.",
+        reason === "unavailable"
+          ? "تحديد الموقع غير متاح على هذا الجهاز."
+          : reason === "permission-denied"
+            ? "اسمح بتحديد الموقع من إعدادات المتصفح."
+            : "تعذر تحديد الموقع. تحقق من GPS ثم أعد المحاولة.",
+      ));
+    } finally {
+      setIsLocating(false);
+    }
+  }
+
   const neededFilters: NeededFilters = useMemo(() => ({
     search:       search || undefined,
     stockFilter:  activeTab === "all" ? undefined : activeTab as "rupture" | "low",
@@ -1015,7 +1481,8 @@ export default function SmartPurchase() {
     supplierId:   activeFilters.supplierId,
     familyId:     activeFilters.familyId,
     brandId:      activeFilters.brandId,
-    supplierCity: activeFilters.supplierCity,
+    supplierWilaya: activeFilters.supplierWilaya,
+    supplierCommune: activeFilters.supplierCommune,
     dateFrom:     activeFilters.dateFrom,
     dateTo:       activeFilters.dateTo,
   }), [search, activeTab, sortBy, activeFilters]);
@@ -1040,8 +1507,6 @@ export default function SmartPurchase() {
   const exclude = useExcludeProduct();
   const deleteSuggestion = useDeleteSuggestion();
   const tapSuggestion    = useTapSuggestion();
-
-  if (!ready) return null;
 
   function handleSnooze(row: NeededRow) {
     setHiddenIds((prev) => new Set([...prev, row.id]));
@@ -1077,9 +1542,12 @@ export default function SmartPurchase() {
     (activeFilters.supplierId ? 1 : 0) +
     (activeFilters.familyId   ? 1 : 0) +
     (activeFilters.brandId    ? 1 : 0) +
-    (activeFilters.supplierCity ? 1 : 0) +
+    (activeFilters.supplierWilaya ? 1 : 0) +
+    (activeFilters.supplierCommune ? 1 : 0) +
     (activeFilters.datePreset  ? 1 : 0);
   const neededLoadError = neededQuery.isError && !neededQuery.data;
+
+  if (!ready) return null;
 
   const tabs: { key: TabKey; fr: string; ar: string; count?: number }[] = [
     { key: "all",     fr: "Tout",        ar: "الكل",     count: ruptureTotal + lowTotal },
@@ -1175,6 +1643,7 @@ export default function SmartPurchase() {
                    row={r}
                    sortBy={sortBy}
                    compact={viewMode === "grid"}
+                    originCoordinates={originCoordinates}
                    onHistory={() => setHistoryProduct(r)}
                    onOrder={() => setOrderProduct(r)}
                    onSnooze={() => handleSnooze(r)}
@@ -1184,6 +1653,71 @@ export default function SmartPurchase() {
             )}
             ListHeaderComponent={
               <View>
+                <View style={main.locationSortRow}>
+                  <View style={main.locationSortCopy}>
+                    <Feather name="map-pin" size={15} color={originCoordinates ? colors.success : colors.textMuted} />
+                    <View style={main.locationSortTextBlock}>
+                      <Text style={main.locationSortTitle}>
+                        {originCoordinates
+                          ? t("Tri par proximité activé", "الترتيب حسب القرب مفعّل")
+                          : t("Trier les fournisseurs par proximité", "رتّب الموردين حسب القرب")}
+                      </Text>
+                      <Text style={main.locationSortHint}>
+                        {originCoordinates
+                          ? t("Distance directe approximative, sans suivi.", "مسافة مباشرة تقريبية، دون تتبع.")
+                          : t("Votre position est demandée uniquement après pression.", "لن يُطلب موقعك إلا بعد الضغط.")}
+                      </Text>
+                    </View>
+                  </View>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={locationPermissionBlocked
+                      ? t("Ouvrir les réglages de localisation", "فتح إعدادات الموقع")
+                      : originCoordinates
+                        ? t("Actualiser ma position", "تحديث موقعي")
+                        : t("Utiliser ma position pour trier", "استخدم موقعي للترتيب")}
+                    disabled={isLocating}
+                    onPress={locationPermissionBlocked ? openLocationSettings : useCurrentLocation}
+                    style={({ pressed }) => [
+                      main.locationSortButton,
+                      (isLocating || pressed) && main.locationSortButtonPressed,
+                    ]}
+                    testID="button-sort-suppliers-by-distance"
+                  >
+                    {isLocating ? (
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    ) : (
+                      <Feather name={locationPermissionBlocked ? "settings" : "crosshair"} size={15} color={colors.primary} />
+                    )}
+                    <Text style={main.locationSortButtonText}>
+                      {isLocating
+                        ? t("Localisation…", "جار تحديد الموقع…")
+                        : locationPermissionBlocked
+                          ? t("Réglages", "الإعدادات")
+                          : originCoordinates
+                            ? t("Actualiser", "تحديث")
+                            : t("Utiliser ma position", "استخدم موقعي")}
+                    </Text>
+                  </Pressable>
+                  {originCoordinates ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={t("Arrêter le tri par proximité", "إيقاف الترتيب حسب القرب")}
+                      onPress={() => {
+                        setOriginCoordinates(null);
+                        setLocationError(null);
+                      }}
+                      style={main.clearLocationButton}
+                      testID="button-clear-supplier-distance"
+                      hitSlop={8}
+                    >
+                      <Feather name="x" size={16} color={colors.textMuted} />
+                    </Pressable>
+                  ) : null}
+                </View>
+                {locationError ? (
+                  <Text style={main.locationError} accessibilityRole="alert">{locationError}</Text>
+                ) : null}
                 {neededQuery.isFetching && neededQuery.data ? (
                   <View style={main.refreshingNotice}>
                     <ActivityIndicator size="small" color={colors.primary} />
@@ -1228,7 +1762,11 @@ export default function SmartPurchase() {
                     { key: "supplier", label: t("Fournisseur", "المورد") },
                     { key: "family", label: t("Famille", "العائلة") },
                     { key: "brand", label: t("Marque", "الماركة") },
-                    { key: "city", label: t("Ville fournisseur", "مدينة المورد") },
+                    { key: "city", label: activeFilters.supplierCommune
+                      ?? (activeFilters.supplierWilaya === UNASSIGNED_WILAYA_FILTER
+                        ? t("Wilaya non précisée", "ولاية غير محددة")
+                        : activeFilters.supplierWilaya)
+                      ?? t("Villes du fournisseur", "مدن المورد") },
                   ].map((item) => (
                     <Pressable key={item.key} onPress={() => setFilterOpen(true)} style={main.quickFilter}>
                       <Text style={main.quickFilterText}>{item.label}</Text>
@@ -1268,7 +1806,7 @@ export default function SmartPurchase() {
             scrollEventThrottle={16}
             ListFooterComponent={neededQuery.isFetchingNextPage
               ? <ActivityIndicator color={colors.primary} style={{ marginVertical: 16 }} />
-              : null}
+              : undefined}
           />
         )
       ) : null}
@@ -1378,6 +1916,16 @@ const main = StyleSheet.create({
   tabTxt: { fontSize: 13, fontWeight: "500", color: colors.textMuted },
   tabTxtActive: { color: colors.primary, fontWeight: "700" },
   searchRow: { flexDirection: "row", alignItems: "center", paddingRight: 16, gap: 8 },
+  locationSortRow: { flexDirection: "row", alignItems: "center", gap: 8, marginHorizontal: 16, marginTop: 10, marginBottom: 4, padding: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
+  locationSortCopy: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 7 },
+  locationSortTextBlock: { flex: 1, minWidth: 0 },
+  locationSortTitle: { color: colors.text, fontSize: 12, fontWeight: "700" },
+  locationSortHint: { color: colors.textMuted, fontSize: 10, marginTop: 2 },
+  locationSortButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, minHeight: 38, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, borderColor: colors.primary, backgroundColor: colors.background },
+  locationSortButtonPressed: { opacity: 0.65 },
+  locationSortButtonText: { color: colors.primary, fontSize: 11, fontWeight: "700" },
+  clearLocationButton: { width: 28, height: 38, alignItems: "center", justifyContent: "center" },
+  locationError: { marginHorizontal: 18, marginBottom: 8, color: colors.danger, fontSize: 12 },
   filterBtn: { width: 42, height: 42, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" },
   filterBtnOn: { backgroundColor: colors.primary, borderColor: colors.primary },
   filterBadge: { position: "absolute", top: -4, right: -4, width: 16, height: 16, borderRadius: 8, backgroundColor: colors.danger, alignItems: "center", justifyContent: "center" },

@@ -10,6 +10,9 @@
       "path": "./lib/api-client-react"
     },
     {
+      "path": "./lib/erp-api-client-react"
+    },
+    {
       "path": "./lib/api-zod"
     }
   ]

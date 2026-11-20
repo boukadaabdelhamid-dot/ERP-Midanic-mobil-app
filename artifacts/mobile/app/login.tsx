@@ -227,12 +227,12 @@ export default function Login() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center", padding: 20 },
-  card: { width: "100%", maxWidth: 400, backgroundColor: colors.surface, borderRadius: 20, padding: 28, alignItems: "center" },
+  card: { width: "100%", maxWidth: 400, backgroundColor: colors.surface, borderRadius: 12, padding: 26, alignItems: "center", borderBottomWidth: 3, borderBottomColor: colors.accent },
   logo: { width: 72, height: 72, borderRadius: 16, marginBottom: 12 },
   title: { fontSize: 26, fontWeight: "700", color: colors.primary },
   subtitle: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
   error: { color: colors.danger, fontSize: 13, marginBottom: 10, textAlign: "center" },
-  passwordToggle: { paddingHorizontal: 12, paddingVertical: 10 },
+  passwordToggle: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center", paddingHorizontal: 10 },
   biometricOption: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 12, paddingHorizontal: 2 },
   biometricCopy: { flexDirection: "row", alignItems: "center", gap: 8, flex: 1 },
   biometricLabel: { color: colors.text, fontSize: 12, flexShrink: 1 },

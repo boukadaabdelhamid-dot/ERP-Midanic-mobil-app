@@ -8,6 +8,7 @@ export type MenuItem = {
   labelAr: string;
   section?: PermSection;
   adminOnly?: boolean;
+  storeKind?: "store" | "factory";
 };
 
 export type MenuGroup = {
@@ -26,6 +27,14 @@ export const MENU_GROUPS: MenuGroup[] = [
       { key: "home", href: "/home", icon: "home", labelFr: "Accueil", labelAr: "الرئيسية" },
       { key: "dashboard", href: "/dashboard", icon: "bar-chart-2", labelFr: "Tableau de bord", labelAr: "لوحة التحكم", section: "dashboard" },
       { key: "mon-compte", href: "/mon-compte", icon: "user", labelFr: "Mon compte", labelAr: "حسابي" },
+    ],
+  },
+  {
+    key: "production",
+    titleFr: "Production",
+    titleAr: "الإنتاج",
+    items: [
+      { key: "manufacturing", href: "/manufacturing", icon: "tool", labelFr: "Atelier de production", labelAr: "ورشة الإنتاج", section: "manufacturing", storeKind: "factory" },
     ],
   },
   {
@@ -50,6 +59,7 @@ export const MENU_GROUPS: MenuGroup[] = [
       { key: "products", href: "/products", icon: "package", labelFr: "Produits", labelAr: "المنتجات", section: "products" },
       { key: "inventory", href: "/inventory", icon: "archive", labelFr: "Inventaire", labelAr: "الجرد", section: "inventory" },
       { key: "transfers", href: "/transfers", icon: "repeat", labelFr: "Transferts", labelAr: "التحويلات", section: "transfers" },
+      { key: "alerts", href: "/alerts", icon: "alert-triangle", labelFr: "Alertes", labelAr: "التنبيهات", section: "alerts", storeKind: "store" },
       { key: "suppliers", href: "/suppliers", icon: "truck", labelFr: "Fournisseurs", labelAr: "الموردون", section: "suppliers" },
       { key: "purchase-orders", href: "/purchase-orders", icon: "clipboard", labelFr: "Bons d'achat", labelAr: "أوامر الشراء", section: "purchases" },
       { key: "smart-purchase", href: "/smart-purchase", icon: "zap", labelFr: "Achat intelligent", labelAr: "الشراء الذكي", section: "purchases" },
@@ -88,3 +98,21 @@ export const MENU_GROUPS: MenuGroup[] = [
     ],
   },
 ];
+
+export function filterMenuGroups(
+  groups: MenuGroup[],
+  selectedStoreKind: "store" | "factory" | undefined,
+  isAdmin: boolean,
+  can: (section: PermSection, action: "view") => boolean,
+): MenuGroup[] {
+  return groups.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => {
+      if (item.storeKind && selectedStoreKind !== item.storeKind) return false;
+      if (isAdmin) return true;
+      if (item.adminOnly) return false;
+      if (item.section) return can(item.section, "view");
+      return true;
+    }),
+  })).filter((group) => group.items.length > 0);
+}

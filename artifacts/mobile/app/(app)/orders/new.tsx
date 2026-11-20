@@ -138,7 +138,7 @@ export default function NewOrder() {
 
   return (
     <Screen>
-      <Card>
+      <Card style={styles.formCard}>
         <SectionTitle>{t("Client", "العميل")}</SectionTitle>
         <PickerField<CustomerSummary>
           label={t("Client enregistré (optionnel)", "عميل مسجل (اختياري)")}
@@ -160,7 +160,7 @@ export default function NewOrder() {
         <FormField label={t("Adresse", "العنوان")} value={customerAddress} onChangeText={setCustomerAddress} />
       </Card>
 
-      <Card>
+      <Card style={styles.formCard}>
         <SectionTitle>{t("Produits", "المنتجات")}</SectionTitle>
         <PickerField<Product>
           label={t("Ajouter un produit", "إضافة منتج")}
@@ -203,7 +203,7 @@ export default function NewOrder() {
         )}
       </Card>
 
-      <Card>
+      <Card style={styles.formCard}>
         <SectionTitle>{t("Paiement", "الدفع")}</SectionTitle>
         <View style={[styles.paymentRow, isRTL && styles.cartRowRTL]}>
           <Button
@@ -248,13 +248,14 @@ export default function NewOrder() {
 }
 
 const styles = StyleSheet.create({
+  formCard: { borderTopWidth: 2, borderTopColor: colors.accent },
   muted: { fontSize: 13, color: colors.textMuted, marginTop: 4 },
-  cartRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 8 },
+  cartRow: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 58, paddingVertical: 10 },
   cartRowRTL: { flexDirection: "row-reverse" },
   cartName: { fontSize: 14, fontWeight: "600", color: colors.text },
   cartSub: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
   paymentRow: { flexDirection: "row", gap: 10, marginBottom: 4 },
-  totalRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 4 },
+  totalRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4, padding: 12, borderRadius: 7, backgroundColor: "#F1E9D6" },
   totalLabel: { fontSize: 15, fontWeight: "600", color: colors.text },
   totalValue: { fontSize: 18, fontWeight: "700", color: colors.primary },
 });

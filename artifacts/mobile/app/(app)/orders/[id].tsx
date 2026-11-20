@@ -109,9 +109,11 @@ export default function OrderDetail() {
 
   return (
     <Screen>
-      <Card>
-        <SectionTitle>{t("Commande", "الطلب")} #{order.id}</SectionTitle>
-        <Badge label={order.status} />
+      <Card style={styles.orderCard}>
+        <View style={[styles.orderHeading, isRTL && styles.retourRowRTL]}>
+          <SectionTitle>{t("Commande", "الطلب")} #{order.id}</SectionTitle>
+          <Badge label={order.status} />
+        </View>
         <Divider />
         <Text style={styles.label}>{t("Client", "العميل")}</Text>
         <Text style={styles.value}>{order.customerName}</Text>
@@ -138,7 +140,7 @@ export default function OrderDetail() {
         )}
       </Card>
 
-      <Card>
+      <Card style={styles.totalCard}>
         <View style={styles.totalRow}>
           <Text style={styles.totalLabel}>{t("Total", "الإجمالي")}</Text>
           <Text style={styles.totalValue}>{Number(order.totalAmount).toLocaleString("fr-FR")} {currency}</Text>
@@ -230,14 +232,17 @@ export default function OrderDetail() {
 }
 
 const styles = StyleSheet.create({
+  orderCard: { borderTopWidth: 2, borderTopColor: colors.accent },
+  orderHeading: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 },
   label: { fontSize: 11, color: colors.textMuted, marginTop: 8 },
   value: { fontSize: 14, color: colors.text, fontWeight: "500" },
   muted: { fontSize: 13, color: colors.textMuted },
-  itemRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 6 },
-  totalRow: { flexDirection: "row", justifyContent: "space-between" },
+  itemRow: { minHeight: 46, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingVertical: 10, borderRadius: 7, backgroundColor: colors.background },
+  totalCard: { borderTopWidth: 2, borderTopColor: colors.accent },
+  totalRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   totalLabel: { fontSize: 15, fontWeight: "600", color: colors.text },
   totalValue: { fontSize: 18, fontWeight: "700", color: colors.primary },
-  retourRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 10 },
+  retourRow: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 52, paddingVertical: 10 },
   retourRowRTL: { flexDirection: "row-reverse" },
   cartName: { fontSize: 14, fontWeight: "600", color: colors.text },
   cartSub: { fontSize: 12, color: colors.textMuted, marginTop: 2 },

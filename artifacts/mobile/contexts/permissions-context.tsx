@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { useMe } from "@/hooks/use-me";
 import { useStoreContext } from "@/contexts/store-context";
@@ -21,8 +21,10 @@ export type PermSection =
   | "attendance"
   | "leaves"
   | "accounting"
-  | "transfers";
-export type PermAction = "view" | "create" | "edit" | "delete";
+  | "transfers"
+  | "alerts"
+  | "manufacturing";
+export type PermAction = "view" | "create" | "edit" | "delete" | "complete";
 
 export type PermRow = { section: string; action: string; granted: boolean };
 
@@ -47,46 +49,71 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
   const [rawPerms, setRawPerms] = useState<PermRow[]>([]);
   const [permMap, setPermMap] = useState<Map<string, boolean>>(new Map());
   const [isLoaded, setIsLoaded] = useState(false);
+  const [loadedScope, setLoadedScope] = useState<string | null>(null);
+  const activeScope = useRef({ token, currentStoreId });
+  activeScope.current = { token, currentStoreId };
+  const scopeKey = token && currentStoreId ? `${token}:${currentStoreId}` : null;
 
   const fetchPerms = useCallback(async () => {
     if (!token || meLoading) return;
     if (isAdmin) {
+      setRawPerms([]);
+      setPermMap(new Map());
+      setLoadedScope(scopeKey);
       setIsLoaded(true);
       return;
     }
     if (!currentStoreId) return;
+    const requestScope = `${token}:${currentStoreId}`;
     try {
       const authToken = getToken();
       const res = await fetch(`${getActiveBaseUrl()}/api/erp/permissions/me`, {
         headers: { Authorization: `Bearer ${authToken}` },
       });
-      if (!res.ok) { setIsLoaded(true); return; }
+      if (activeScope.current.token !== token || activeScope.current.currentStoreId !== currentStoreId) return;
+      if (!res.ok) {
+        setRawPerms([]);
+        setPermMap(new Map());
+        setLoadedScope(requestScope);
+        setIsLoaded(true);
+        return;
+      }
       const rows: PermRow[] = await res.json();
+      if (activeScope.current.token !== token || activeScope.current.currentStoreId !== currentStoreId) return;
       const map = new Map<string, boolean>();
       rows.forEach((r) => map.set(`${r.section}:${r.action}`, r.granted));
       setRawPerms(rows);
       setPermMap(map);
+      setLoadedScope(requestScope);
       setIsLoaded(true);
     } catch {
+      if (activeScope.current.token !== token || activeScope.current.currentStoreId !== currentStoreId) return;
+      setRawPerms([]);
+      setPermMap(new Map());
+      setLoadedScope(requestScope);
       setIsLoaded(true);
     }
-  }, [token, isAdmin, meLoading, currentStoreId]);
+  }, [token, isAdmin, meLoading, currentStoreId, scopeKey]);
 
   useEffect(() => {
     setIsLoaded(false);
+    setLoadedScope(null);
+    setRawPerms([]);
+    setPermMap(new Map());
     fetchPerms();
   }, [fetchPerms]);
 
   const can = useCallback(
     (section: PermSection, action: PermAction): boolean => {
       if (isAdmin) return true;
+      if (!scopeKey || loadedScope !== scopeKey) return false;
       return permMap.get(`${section}:${action}`) ?? false;
     },
-    [isAdmin, permMap],
+    [isAdmin, loadedScope, permMap, scopeKey],
   );
 
   return (
-    <PermContext.Provider value={{ can, rawPerms, isLoaded, refetch: fetchPerms }}>
+    <PermContext.Provider value={{ can, rawPerms, isLoaded: isLoaded && loadedScope === scopeKey, refetch: fetchPerms }}>
       {children}
     </PermContext.Provider>
   );

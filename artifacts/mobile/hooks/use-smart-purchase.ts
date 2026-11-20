@@ -5,6 +5,17 @@
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { getActiveBaseUrl } from "@/lib/api";
 import { getToken } from "@/lib/auth-storage";
+import { getGetSuppliersQueryKey } from "@workspace/api-client-react";
+import { useStoreContext } from "@/contexts/store-context";
+import { loadSupplierPages, type SearchableSupplier } from "@/lib/supplier-search";
+
+export {
+  formatSupplierDistance,
+  getSupplierDistanceKm,
+  hasValidSupplierCoordinates,
+  sortSuppliersByDistance,
+} from "@/lib/supplier-distance";
+export type { DeviceCoordinates } from "@/lib/supplier-distance";
 
 export async function erpFetch(path: string, init?: RequestInit) {
   const token = getToken();
@@ -26,6 +37,22 @@ export async function erpFetch(path: string, init?: RequestInit) {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+export type NeededSupplier = {
+  id: number;
+  name: string;
+  city: string | null;
+  wilaya: string | null;
+  commune: string | null;
+  phone: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  location_accuracy_meters?: number | null;
+  location_captured_at?: string | null;
+  /** Latest received purchase line, never the product's average cost. */
+  last_unit_cost?: string | number | null;
+  last_purchase_date?: string | null;
+};
+
 export type NeededRow = {
   id: number;
   designation: string;
@@ -39,6 +66,7 @@ export type NeededRow = {
   famille: string | null;
   famille_ar: string | null;
   marque: string | null;
+  suppliers: NeededSupplier[];
   supplier_id: number | null;
   supplier_name: string | null;
   supplier_city: string | null;
@@ -56,7 +84,8 @@ export type NeededResponse = {
 export type FilterOptions = {
   families: { id: number; nameFr: string; nameAr: string }[];
   brands:   { id: number; nameFr: string; nameAr: string }[];
-  supplierCities: string[];
+  supplierLocations: { wilaya: string | null; commune: string | null }[];
+  suppliers: { id: number; name: string }[];
 };
 
 export type PurchaseSuggestion = {
@@ -107,7 +136,8 @@ export type NeededFilters = {
   supplierId?: number | null;
   familyId?: number | null;
   brandId?: number | null;
-  supplierCity?: string | null;
+  supplierWilaya?: string | null;
+  supplierCommune?: string | null;
   dateFrom?: string | null;
   dateTo?: string | null;
 };
@@ -115,6 +145,8 @@ export type NeededFilters = {
 // ─── Needed products (infinite) ───────────────────────────────────────────────
 
 const PAGE_LIMIT = 10;
+export const PURCHASES_NEEDED_QUERY_KEY = ["purchases-needed"] as const;
+export const PURCHASE_FILTER_OPTIONS_QUERY_KEY = ["purchases-filter-options"] as const;
 
 function buildNeededUrl(filters: NeededFilters, offset: number): string {
   const p = new URLSearchParams({ limit: String(PAGE_LIMIT), offset: String(offset) });
@@ -124,7 +156,8 @@ function buildNeededUrl(filters: NeededFilters, offset: number): string {
   if (filters.supplierId) p.set("supplierId",  String(filters.supplierId));
   if (filters.familyId)   p.set("familyId",    String(filters.familyId));
   if (filters.brandId)    p.set("brandId",     String(filters.brandId));
-  if (filters.supplierCity) p.set("supplierCity", filters.supplierCity);
+  if (filters.supplierWilaya) p.set("supplierWilaya", filters.supplierWilaya);
+  if (filters.supplierCommune) p.set("supplierCommune", filters.supplierCommune);
   if (filters.dateFrom)   p.set("dateFrom",    filters.dateFrom);
   if (filters.dateTo)     p.set("dateTo",      filters.dateTo);
   return `/api/erp/purchases/needed?${p}`;
@@ -132,7 +165,7 @@ function buildNeededUrl(filters: NeededFilters, offset: number): string {
 
 export function useNeededProducts(filters: NeededFilters, enabled: boolean) {
   return useInfiniteQuery<NeededResponse>({
-    queryKey: ["purchases-needed", filters],
+    queryKey: [...PURCHASES_NEEDED_QUERY_KEY, filters],
     queryFn: ({ pageParam }) =>
       erpFetch(buildNeededUrl(filters, (pageParam as number) ?? 0)),
     initialPageParam: 0,
@@ -151,11 +184,11 @@ export function useNeededProducts(filters: NeededFilters, enabled: boolean) {
 
 // ─── Filter options ────────────────────────────────────────────────────────────
 
-export function useFilterOptions(enabled: boolean) {
+export function useFilterOptions(enabled: boolean, storeId: number | null) {
   return useQuery<FilterOptions>({
-    queryKey: ["purchases-filter-options"],
+    queryKey: [...PURCHASE_FILTER_OPTIONS_QUERY_KEY, storeId],
     queryFn: () => erpFetch("/api/erp/purchases/filter-options"),
-    enabled,
+    enabled: enabled && storeId !== null,
     staleTime: 5 * 60_000,
     retry: 0,
     refetchOnWindowFocus: false,
@@ -281,22 +314,19 @@ export function useAddToPO() {
 
 // ─── All suppliers (for quick-order sheet) ───────────────────────────────────
 
-export type SupplierRow = {
-  id: number;
-  name: string;
-  city: string | null;
+export type SupplierRow = SearchableSupplier & {
   phone: string | null;
 };
 
 export function useSuppliersAll(enabled: boolean) {
+  const { currentStoreId } = useStoreContext();
   return useQuery<SupplierRow[]>({
-    queryKey: ["suppliers-all"],
-    queryFn: async () => {
-      const json = await erpFetch("/api/erp/suppliers?limit=500") as { data: SupplierRow[] };
-      return json.data ?? [];
-    },
-    enabled,
-    staleTime: 5 * 60_000,
+    queryKey: [...getGetSuppliersQueryKey(), "quick-order", getActiveBaseUrl(), currentStoreId],
+    queryFn: ({ signal }) => loadSupplierPages<SupplierRow>((page, limit) =>
+      erpFetch(`/api/erp/suppliers?limit=${limit}&page=${page}`, { signal })),
+    enabled: enabled && currentStoreId != null,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 }
 

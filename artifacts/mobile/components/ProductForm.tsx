@@ -14,6 +14,7 @@ import { useLang } from "@/contexts/lang-context";
 import { Card, Button, FormField, SectionTitle, Divider } from "@/components/ui";
 import { PickerField } from "@/components/Picker";
 import { colors } from "@/lib/colors";
+import { useCurrentStore } from "@/hooks/use-current-store";
 
 export type ProductFormValues = {
   nameEn: string;
@@ -33,6 +34,7 @@ export type ProductFormValues = {
   model: string;
   color: string;
   catalogueType: string;
+  manufacturingRole: "raw_material" | "finished_good";
   colisage: string;
   weight: string;
   catalogue1: string;
@@ -68,6 +70,7 @@ export function emptyProductForm(): ProductFormValues {
     model: "",
     color: "",
     catalogueType: "ARTICLE",
+    manufacturingRole: "raw_material",
     colisage: "1",
     weight: "",
     catalogue1: "",
@@ -105,6 +108,7 @@ export function productToForm(p: Product): ProductFormValues {
     model: p.model ?? "",
     color: p.color ?? "",
     catalogueType: p.catalogueType ?? "ARTICLE",
+    manufacturingRole: p.manufacturingRole === "finished_good" ? "finished_good" : "raw_material",
     colisage: p.colisage != null ? String(p.colisage) : "1",
     weight: p.weight != null ? String(p.weight) : "",
     catalogue1: p.catalogue1 ?? "",
@@ -145,6 +149,7 @@ export function ProductForm({
   uploadingImage = false,
   onGenerateBarcode,
   generatingBarcode = false,
+  canManageManufacturingRole = false,
 }: {
   mode: "create" | "edit";
   values: ProductFormValues;
@@ -162,8 +167,10 @@ export function ProductForm({
   uploadingImage?: boolean;
   onGenerateBarcode?: () => void;
   generatingBarcode?: boolean;
+  canManageManufacturingRole?: boolean;
 }) {
   const { t, lang } = useLang();
+  const { isFactory } = useCurrentStore();
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const { data: categoriesData } = useGetCategories({
@@ -200,7 +207,7 @@ export function ProductForm({
     const next: Record<string, string> = {};
     if (!values.nameEn.trim()) next.nameEn = t("Requis", "مطلوب");
     if (!values.nameAr.trim()) next.nameAr = t("Requis", "مطلوب");
-    if (!values.price.trim() || !isValidNumber(values.price) || parseNumber(values.price) < 0) next.price = t("Prix invalide", "سعر غير صالح");
+    if ((!isFactory || values.price.trim()) && (!isValidNumber(values.price) || parseNumber(values.price) < 0)) next.price = t("Prix invalide", "سعر غير صالح");
     for (const [key, label] of [
       ["costPrice", t("prix de revient", "سعر التكلفة")],
       ["priceGros", t("prix gros", "سعر الجملة")],
@@ -227,6 +234,23 @@ export function ProductForm({
     <View>
       <Card>
         <SectionTitle>{t("Identité", "الهوية")}</SectionTitle>
+        {isFactory && canManageManufacturingRole ? (
+          <PickerField
+            label={t("Type de produit de production", "تصنيف المنتج في وحدة الإنتاج")}
+            placeholder={t("Choisir le type", "اختر التصنيف")}
+            value={{ key: values.manufacturingRole }}
+            items={[{ key: "raw_material" as const }, { key: "finished_good" as const }]}
+            keyExtractor={(item) => item.key}
+            labelExtractor={(item) => item.key === "raw_material"
+              ? t("Matière première", "مادة أولية")
+              : t("Produit fini prêt à vendre", "منتج جاهز للبيع")}
+            onChange={(item) => onChange({
+              ...values,
+              manufacturingRole: item.key,
+              isExposed: item.key === "raw_material" ? false : values.isExposed,
+            })}
+          />
+        ) : null}
         <FormField label={t("Nom du produit", "اسم المنتج (فرنسي)")} value={values.nameEn} onChangeText={(v) => set("nameEn", v)} error={errors.nameEn} />
         <FormField label={t("Nom (arabe)", "الاسم بالعربية")} value={values.nameAr} onChangeText={(v) => set("nameAr", v)} error={errors.nameAr} />
         <PickerField<Category>
@@ -251,6 +275,7 @@ export function ProductForm({
       <Card>
         <SectionTitle>{t("Prix", "الأسعار")}</SectionTitle>
         <FormField label={t("Prix de vente", "سعر البيع")} value={values.price} onChangeText={(v) => set("price", v)} keyboardType="decimal-pad" error={errors.price} />
+        {isFactory ? <Text style={styles.toggleLabel}>{t("Prix de vente optionnel dans l’unité de production.", "سعر البيع اختياري في وحدة الإنتاج.")}</Text> : null}
         <FormField label={t("Prix de revient", "سعر التكلفة")} value={values.costPrice} onChangeText={(v) => set("costPrice", v)} keyboardType="decimal-pad" error={errors.costPrice} />
         <FormField label={t("Prix gros", "سعر الجملة")} value={values.priceGros} onChangeText={(v) => set("priceGros", v)} keyboardType="decimal-pad" error={errors.priceGros} />
         {enhancedEdit ? (
@@ -400,7 +425,9 @@ export function ProductForm({
         <SectionTitle>{t("Visibilité", "الظهور")}</SectionTitle>
         <ToggleRow label={t("Produit actif", "منتج نشط")} value={values.isActive} onChange={(v) => set("isActive", v)} />
         <Divider />
-        <ToggleRow label={t("Visible en vitrine", "ظاهر في الواجهة")} value={values.isExposed} onChange={(v) => set("isExposed", v)} />
+        {isFactory && values.manufacturingRole === "raw_material"
+          ? <Text style={styles.toggleLabel}>{t("Les matières premières ne sont pas exposées à la vente.", "المواد الأولية لا تُعرض للبيع.")}</Text>
+          : <ToggleRow label={t("Visible en vitrine", "ظاهر في الواجهة")} value={values.isExposed} onChange={(v) => set("isExposed", v)} />}
       </Card>
 
       <Button label={submitLabel} onPress={handleSubmit} loading={submitting} testID="button-submit-product" />
@@ -427,24 +454,24 @@ function ToggleRow({ label, value, onChange }: { label: string; value: boolean; 
 }
 
 const styles = StyleSheet.create({
-  toggleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 4 },
+  toggleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: 48, paddingVertical: 4 },
   toggleLabel: { fontSize: 14, color: colors.text, fontWeight: "500" },
-  toggleBtn: { width: 44, paddingVertical: 6 },
-  barcodeButton: { marginBottom: 4 },
-  imageGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  imageItem: { width: 100, height: 124, borderRadius: 10, overflow: "hidden", borderWidth: 1, borderColor: colors.border, position: "relative" },
-  productImage: { width: "100%", height: 92, backgroundColor: colors.background },
-  primaryLabel: { height: 31, paddingTop: 6, textAlign: "center", color: colors.success, fontSize: 11, fontWeight: "700" },
-  primaryButton: { height: 31, alignItems: "center", justifyContent: "center", backgroundColor: colors.background },
+  toggleBtn: { width: 48, minHeight: 40, paddingVertical: 6 },
+  barcodeButton: { marginBottom: 8 },
+  imageGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
+  imageItem: { width: 104, height: 136, borderRadius: 8, overflow: "hidden", borderWidth: 1, borderColor: colors.border, position: "relative", backgroundColor: colors.surface },
+  productImage: { width: "100%", height: 100, backgroundColor: colors.background },
+  primaryLabel: { height: 35, paddingTop: 8, textAlign: "center", color: colors.success, fontSize: 11, fontWeight: "700", backgroundColor: "#E3EFE8" },
+  primaryButton: { height: 35, alignItems: "center", justifyContent: "center", backgroundColor: "#F1E9D6" },
   primaryButtonText: { color: colors.primary, fontSize: 11, fontWeight: "600" },
-  imageControls: { height: 31, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 5, backgroundColor: colors.background },
+  imageControls: { height: 35, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 6, backgroundColor: colors.background },
   reorderRow: { flexDirection: "row", gap: 6 },
   reorderText: { color: colors.primary, fontSize: 20, lineHeight: 20, fontWeight: "700" },
   disabledText: { color: colors.border },
   cameraIcon: { color: colors.primary, fontSize: 26, lineHeight: 30 },
   removeImage: { position: "absolute", top: 3, right: 3, width: 22, height: 22, borderRadius: 11, backgroundColor: colors.danger, alignItems: "center", justifyContent: "center" },
   removeImageText: { color: "#fff", fontSize: 18, lineHeight: 20 },
-  addImage: { width: 100, height: 124, borderRadius: 10, borderWidth: 1, borderStyle: "dashed", borderColor: colors.primary, alignItems: "center", justifyContent: "center", backgroundColor: colors.background },
+  addImage: { width: 104, height: 136, borderRadius: 8, borderWidth: 1, borderStyle: "dashed", borderColor: colors.accent, alignItems: "center", justifyContent: "center", backgroundColor: "#F8F5ED" },
   addImageText: { color: colors.primary, fontSize: 30, lineHeight: 34 },
   addImageLabel: { color: colors.primary, fontSize: 12, fontWeight: "600" },
 });

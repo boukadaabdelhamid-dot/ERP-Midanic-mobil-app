@@ -8,13 +8,15 @@ export function SearchBar({
   value,
   onChangeText,
   placeholder,
+  compact = false,
 }: {
   value: string;
   onChangeText: (v: string) => void;
   placeholder: string;
+  compact?: boolean;
 }) {
   return (
-    <View style={styles.searchBar}>
+    <View style={[styles.searchBar, compact && styles.searchBarCompact]}>
       <Feather name="search" size={16} color={colors.textMuted} />
       <TextInput
         value={value}
@@ -76,12 +78,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 10,
-    paddingHorizontal: 12,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    minHeight: 48,
     marginBottom: 12,
     marginHorizontal: 16,
     marginTop: 16,
   },
-  searchInput: { flex: 1, paddingVertical: 10, fontSize: 14, color: colors.text },
+  searchBarCompact: { marginHorizontal: 0, marginVertical: 0, marginTop: 0, minHeight: 45 },
+  searchInput: { flex: 1, paddingVertical: 12, fontSize: 15, color: colors.text },
   listContent: { paddingBottom: 40 },
 });

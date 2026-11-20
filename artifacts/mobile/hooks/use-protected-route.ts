@@ -11,12 +11,14 @@ import { usePermissions, type PermSection } from "@/contexts/permissions-context
  * unauthorized users and reports whether the screen should show a loading
  * state while auth/permission data resolves.
  */
-export function useProtectedRoute(opts: { section?: PermSection; adminOnly?: boolean } = {}) {
+export function useProtectedRoute(
+  opts: { section?: PermSection; adminOnly?: boolean; storeKind?: "store" | "factory" } = {},
+) {
   const router = useRouter();
   const rootNavigationState = useRootNavigationState();
   const { token, logout } = useAuth();
   const { serverUrl, isServerReady } = useServer();
-  const { currentStoreId } = useStoreContext();
+  const { currentStoreId, stores: contextStores } = useStoreContext();
   const { isAdmin, isStaff, role, isLoading, user } = useMe();
   const { can, isLoaded: permsLoaded } = usePermissions();
 
@@ -27,7 +29,9 @@ export function useProtectedRoute(opts: { section?: PermSection; adminOnly?: boo
     return () => clearTimeout(timer);
   }, [rootNavigationState?.key, role, logout]);
 
-  const stores = (user as { stores?: unknown[] } | null)?.stores ?? [];
+  const userStores = (user as { stores?: Array<{ id: number; kind?: "store" | "factory" }> } | null)?.stores ?? [];
+  const stores = (userStores.length ? userStores : contextStores) as Array<{ id: number; kind?: "store" | "factory" }>;
+  const currentStore = stores.find((store) => store.id === currentStoreId);
 
   useEffect(() => {
     if (!rootNavigationState?.key) return;
@@ -43,6 +47,14 @@ export function useProtectedRoute(opts: { section?: PermSection; adminOnly?: boo
       redirect = "/login";
     } else if (!currentStoreId && stores.length > 0) {
       redirect = "/select-store";
+    } else if (currentStoreId && !currentStore) {
+      // Fail closed when a persisted or stale selection is no longer among
+      // the stores this account can access.
+      redirect = "/select-store";
+    } else if (opts.storeKind && !currentStore) {
+      redirect = "/select-store";
+    } else if (opts.storeKind && currentStore && currentStore.kind !== opts.storeKind) {
+      redirect = "/home";
     } else if (opts.adminOnly && !isAdmin) {
       redirect = "/home";
     } else if (opts.section && !isAdmin) {
@@ -55,7 +67,7 @@ export function useProtectedRoute(opts: { section?: PermSection; adminOnly?: boo
     const timer = setTimeout(() => router.replace(redirect as never), 0);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rootNavigationState?.key, isServerReady, serverUrl, token, isLoading, user, isStaff, currentStoreId, stores.length, isAdmin, permsLoaded]);
+  }, [rootNavigationState?.key, isServerReady, serverUrl, token, isLoading, user, isStaff, currentStoreId, stores.length, currentStore?.kind, isAdmin, permsLoaded]);
 
   const ready =
     !!rootNavigationState?.key &&
@@ -64,8 +76,10 @@ export function useProtectedRoute(opts: { section?: PermSection; adminOnly?: boo
     !isLoading &&
     (!user || isStaff) &&
     (!!currentStoreId || stores.length === 0) &&
+    (!currentStoreId || !!currentStore) &&
+    (!opts.storeKind || currentStore?.kind === opts.storeKind) &&
     (!opts.adminOnly || isAdmin) &&
-    (!opts.section || isAdmin || permsLoaded);
+    (!opts.section || isAdmin || (permsLoaded && can(opts.section, "view")));
 
   return { ready, isAdmin, can };
 }

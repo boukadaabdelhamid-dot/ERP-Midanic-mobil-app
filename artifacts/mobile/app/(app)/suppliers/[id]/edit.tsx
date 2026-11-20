@@ -13,6 +13,7 @@ import { useApiFeedback } from "@/hooks/use-api-feedback";
 import { Screen } from "@/components/Screen";
 import { LoadingView, ErrorState } from "@/components/ui";
 import { SupplierForm, emptySupplierForm, supplierToForm, type SupplierFormValues } from "@/components/SupplierForm";
+import { PURCHASE_FILTER_OPTIONS_QUERY_KEY, PURCHASES_NEEDED_QUERY_KEY } from "@/hooks/use-smart-purchase";
 
 export default function EditSupplier() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -57,6 +58,14 @@ export default function EditSupplier() {
           email: values.email.trim() || undefined,
           phone: values.phone.trim() || undefined,
           address: values.address.trim() || undefined,
+          wilaya: values.wilaya.trim(),
+          commune: values.commune.trim(),
+          latitude: values.latitude,
+          longitude: values.longitude,
+          ...{
+            locationAccuracyMeters: values.locationAccuracyMeters,
+            locationCapturedAt: values.locationCapturedAt,
+          },
           notes: values.notes.trim() || undefined,
           contactType: values.contactType,
         },
@@ -65,6 +74,8 @@ export default function EditSupplier() {
         onSuccess: () => {
           feedback.success("Fournisseur mis à jour", "تم تحديث المورد");
           queryClient.invalidateQueries({ queryKey: getGetSuppliersQueryKey() });
+          queryClient.invalidateQueries({ queryKey: PURCHASE_FILTER_OPTIONS_QUERY_KEY });
+          queryClient.invalidateQueries({ queryKey: PURCHASES_NEEDED_QUERY_KEY });
           router.replace(`/suppliers/${supplierId}` as never);
         },
         onError: (e) => feedback.error(e),

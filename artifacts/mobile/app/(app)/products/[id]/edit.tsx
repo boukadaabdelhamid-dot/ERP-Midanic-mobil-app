@@ -18,11 +18,16 @@ import { Screen } from "@/components/Screen";
 import { LoadingView, ErrorState } from "@/components/ui";
 import { ProductForm, emptyProductForm, productToForm, type ProductFormValues } from "@/components/ProductForm";
 import { moveProductImage, normalizeLocalImages, normalizeProductImages, uploadProductImage } from "@/lib/product-images";
+import { useCurrentStore } from "@/hooks/use-current-store";
+import { manufacturingQueryKeys } from "@workspace/api-client-react";
+import { canShowProductionClassification, productionProductFields } from "@/lib/production-products";
 
 export default function EditProduct() {
   const { id } = useLocalSearchParams<{ id?: string | string[] }>();
   const { ready, isAdmin, can } = useProtectedRoute({ section: "products" });
   const { t } = useLang();
+  const { isFactory } = useCurrentStore();
+  const canManageManufacturingRole = canShowProductionClassification(isFactory, isAdmin || can("manufacturing", "edit"));
   const router = useRouter();
   const queryClient = useQueryClient();
   const feedback = useApiFeedback();
@@ -147,7 +152,7 @@ export default function EditProduct() {
       nameAr: values.nameAr.trim(),
       descriptionEn: values.descriptionEn.trim(),
       descriptionAr: values.descriptionAr.trim(),
-       price: normalizeDecimal(values.price),
+      ...productionProductFields(isFactory, values, canManageManufacturingRole),
       categoryId: values.categoryId,
       reference: values.reference.trim() || null,
       barcode: values.barcode.trim() || null,
@@ -172,7 +177,6 @@ export default function EditProduct() {
       colorId: values.colorId,
        minStock: values.minStock.trim() ? parseNumber(values.minStock) : null,
       isActive: values.isActive,
-      isExposed: values.isExposed,
       imageUrl: images.find((image) => image.isPrimary)?.url ?? images[0]?.url ?? null,
       images: images.map((image, index) => ({
         url: image.url,
@@ -188,6 +192,8 @@ export default function EditProduct() {
           feedback.success("Produit mis à jour", "تم تحديث المنتج");
           queryClient.invalidateQueries({ queryKey: getGetProductQueryKey(productId) });
           queryClient.invalidateQueries({ queryKey: getGetProductsQueryKey() });
+          queryClient.invalidateQueries({ queryKey: manufacturingQueryKeys.catalogue });
+          queryClient.invalidateQueries({ queryKey: manufacturingQueryKeys.replenishment });
            router.replace({ pathname: "/products/[id]", params: { id: String(productId) } } as never);
         },
         onError: (e) => feedback.error(e),
@@ -221,6 +227,7 @@ export default function EditProduct() {
         uploadingImage={uploadingImage}
         onGenerateBarcode={handleGenerateBarcode}
         generatingBarcode={generateBarcode.isPending}
+        canManageManufacturingRole={canManageManufacturingRole}
       />
     </Screen>
   );

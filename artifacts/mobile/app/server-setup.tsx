@@ -14,24 +14,41 @@ import { useLang } from "@/contexts/lang-context";
 import { colors } from "@/lib/colors";
 import { Button, FormField } from "@/components/ui";
 
-/** Normalise raw user input into a clean https:// URL. */
-function normaliseUrl(raw: string): string {
-  let url = raw.trim().replace(/\/+$/, "");
-  if (!url) return "";
-  // Prepend https:// if no protocol given
-  if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
-  return url;
+/** Convert a company domain into its HTTPS origin, without an API path. */
+function normaliseCompanyDomain(raw: string): string | null {
+  const value = raw.trim().replace(/\/+$/, "");
+  if (!value) return null;
+
+  const candidate = /^https?:\/\//i.test(value) ? value : `https://${value}`;
+  try {
+    const url = new URL(candidate);
+    const isLocalDevelopmentHost = ["localhost", "127.0.0.1"].includes(url.hostname);
+    if (
+      !url.hostname ||
+      url.username ||
+      url.password ||
+      url.pathname !== "/" ||
+      url.search ||
+      url.hash ||
+      (url.protocol !== "https:" && !(isLocalDevelopmentHost && url.protocol === "http:"))
+    ) {
+      return null;
+    }
+    return url.origin;
+  } catch {
+    return null;
+  }
 }
 
-/** Attempt to reach the server — resolves true on any HTTP response, false on
- *  network errors or timeouts. */
+/** Verify that this company ERP API is reachable. */
 async function pingServer(url: string): Promise<boolean> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8000);
   try {
-    // HEAD on root — api-server responds with 404 but still proves connectivity.
-    await fetch(`${url}/`, { method: "HEAD", signal: controller.signal });
-    return true;
+    const response = await fetch(`${url}/api/healthz`, {
+      signal: controller.signal,
+    });
+    return response.ok;
   } catch {
     return false;
   } finally {
@@ -50,9 +67,14 @@ export default function ServerSetup() {
 
   const onConnect = async () => {
     setError(null);
-    const url = normaliseUrl(urlInput);
+    const url = normaliseCompanyDomain(urlInput);
     if (!url) {
-      setError(t("Veuillez saisir une adresse serveur.", "الرجاء إدخال رابط الخادم."));
+      setError(
+        t(
+          "Saisissez un domaine valide, par exemple platino.midanic.com.",
+          "أدخل نطاقاً صحيحاً، مثال: platino.midanic.com.",
+        ),
+      );
       return;
     }
 
@@ -63,8 +85,8 @@ export default function ServerSetup() {
     if (!reachable) {
       setError(
         t(
-          "Impossible de joindre ce serveur. Vérifiez l'adresse et votre connexion.",
-          "تعذّر الاتصال بهذا الخادم. تحقق من الرابط واتصالك بالإنترنت.",
+          "Impossible de joindre l'ERP de cette entreprise. Vérifiez le domaine et votre connexion.",
+          "تعذّر الوصول إلى ERP الشركة. تحقق من النطاق واتصالك بالإنترنت.",
         ),
       );
       return;
@@ -92,17 +114,17 @@ export default function ServerSetup() {
 
         <Text style={styles.hint}>
           {t(
-            "Saisissez l'adresse (URL) de votre serveur ERP API.",
-            "أدخل رابط خادم ERP الخاص بك.",
+            "Saisissez le domaine de votre entreprise pour accéder à son ERP, par exemple platino.midanic.com.",
+            "أدخل نطاق شركتك للاتصال بنظام ERP الخاص بها، مثال: platino.midanic.com.",
           )}
         </Text>
 
         <View style={{ marginTop: 16, width: "100%" }}>
           <FormField
-            label={t("Adresse du serveur", "رابط الخادم")}
+            label={t("Domaine de l'entreprise", "نطاق الشركة")}
             value={urlInput}
             onChangeText={setUrlInput}
-            placeholder="https://api.example.com"
+            placeholder="platino.midanic.com"
             keyboardType="default"
             autoCapitalize="none"
           />
@@ -141,9 +163,11 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 400,
     backgroundColor: colors.surface,
-    borderRadius: 20,
-    padding: 28,
+    borderRadius: 12,
+    padding: 26,
     alignItems: "center",
+    borderBottomWidth: 3,
+    borderBottomColor: colors.accent,
   },
   logo: { width: 72, height: 72, borderRadius: 16, marginBottom: 12 },
   title: { fontSize: 26, fontWeight: "700", color: colors.primary },

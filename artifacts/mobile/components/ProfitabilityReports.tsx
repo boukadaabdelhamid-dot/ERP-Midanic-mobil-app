@@ -1,6 +1,18 @@
 import React, { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { Feather } from "@expo/vector-icons";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
 import {
   getGetAnalyticsQueryKey,
   getGetCustomerProfitReportQueryKey,
@@ -12,15 +24,20 @@ import {
   useGetMonthlyReport,
   useGetProductProfitReport,
   useGetSupplierReport,
+  useGetExpenseReportDetails,
+  type ExpenseReportItem,
   type CustomerProfitRow,
   type MonthlyReportRow,
   type ProductProfitRow,
   type SupplierReportRow,
 } from "@workspace/api-client-react";
 import { useLang } from "@/contexts/lang-context";
+import { useStoreContext } from "@/contexts/store-context";
+import { useApiFeedback } from "@/hooks/use-api-feedback";
 import { Screen } from "@/components/Screen";
 import { Card, ErrorState, LoadingView, SectionTitle } from "@/components/ui";
 import { DateField } from "@/components/DateField";
+import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { colors } from "@/lib/colors";
 
 type ReportTab = "monthly" | "product" | "customer" | "supplier";
@@ -146,11 +163,13 @@ function MonthlyView({
   currency,
   lang,
   emptyLabel,
+  onOpenExpenses,
 }: {
   rows: MonthlyReportRow[];
   currency: string;
   lang: "fr" | "ar";
   emptyLabel: string;
+  onOpenExpenses: (month: string) => void;
 }) {
   const max = Math.max(
     ...rows.flatMap((row) => [row.totalRevenue, row.grossProfit, row.totalExpenses, row.netProfit].map((value) => Math.max(value, 0))),
@@ -211,6 +230,15 @@ function MonthlyView({
               <Metric label={lang === "ar" ? "الهامش" : "Marge"} value={formatPercent(row.grossMargin)} color={colors.success} />
               <Metric label={lang === "ar" ? "الربح الصافي" : "Bénéfice net"} value={formatAmount(row.netProfit, currency)} color={colors.primary} />
             </View>
+            <Pressable
+              onPress={() => onOpenExpenses(row.month)}
+              style={styles.expenseLink}
+              accessibilityRole="button"
+              testID={`button-expense-details-${row.month}`}
+            >
+              <Feather name="file-text" size={14} color={colors.primary} />
+              <Text style={styles.expenseLinkText}>{lang === "ar" ? "عرض تفاصيل المصاريف" : "Voir le détail des charges"}</Text>
+            </Pressable>
           </View>
         ))}
       </Card>
@@ -313,12 +341,17 @@ function SupplierView({ rows, currency, lang, emptyLabel }: { rows: SupplierRepo
 
 export default function ProfitabilityReports({ ready }: { ready: boolean }) {
   const { t, lang } = useLang();
+  const { currentStoreId, stores } = useStoreContext();
+  const feedback = useApiFeedback();
   const currency = lang === "ar" ? "دج" : "DA";
   const today = new Date();
   const [fromDate, setFromDate] = useState<Date>(subtractDays(today, 29));
   const [toDate, setToDate] = useState<Date>(today);
   const [range, setRange] = useState<RangeDays | null>(30);
   const [tab, setTab] = useState<ReportTab>("monthly");
+  const [chargePeriod, setChargePeriod] = useState<{ month: string; from: string; to: string; storeName: string } | null>(null);
+  const [chargeSearch, setChargeSearch] = useState("");
+  const [chargeCategory, setChargeCategory] = useState("all");
 
   const params = useMemo(() => ({ from: dateOnly(fromDate), to: dateOnly(toDate) }), [fromDate, toDate]);
   const invalidPeriod = toDate < fromDate;
@@ -339,12 +372,34 @@ export default function ProfitabilityReports({ ready }: { ready: boolean }) {
   const supplierQuery = useGetSupplierReport(params, {
     query: { enabled: queryEnabled && tab === "supplier", queryKey: getGetSupplierReportQueryKey(params) },
   });
+  const expenseQuery = useGetExpenseReportDetails(
+    chargePeriod ? { from: chargePeriod.from, to: chargePeriod.to } : null,
+    ready && chargePeriod != null,
+  );
 
   const setQuickRange = (days: RangeDays) => {
     const end = new Date();
     setRange(days);
     setToDate(end);
     setFromDate(subtractDays(end, days - 1));
+  };
+
+  const openExpenseDetails = (month: string) => {
+    const [year, monthNumber] = month.split("-").map(Number);
+    if (!year || !monthNumber || monthNumber < 1 || monthNumber > 12) return;
+    const monthStart = `${month}-01`;
+    const monthEnd = new Date(Date.UTC(year, monthNumber, 0)).toISOString().slice(0, 10);
+    const fromBound = dateOnly(fromDate);
+    const toBound = dateOnly(toDate);
+    const store = stores.find((item) => item.id === currentStoreId);
+    setChargeSearch("");
+    setChargeCategory("all");
+    setChargePeriod({
+      month,
+      from: fromBound > monthStart ? fromBound : monthStart,
+      to: toBound < monthEnd ? toBound : monthEnd,
+      storeName: (lang === "ar" ? store?.nameAr || store?.nameEn : store?.nameEn) || String(currentStoreId ?? "—"),
+    });
   };
 
   const refresh = () => {
@@ -379,7 +434,7 @@ export default function ProfitabilityReports({ ready }: { ready: boolean }) {
     tab === "customer" ? customerQuery : supplierQuery;
 
   return (
-    <Screen onRefresh={refresh} refreshing={analyticsQuery.isRefetching || activeQuery.isRefetching}>
+    <Screen onRefresh={refresh} refreshing={analyticsQuery.isRefetching || activeQuery.isRefetching || expenseQuery.isRefetching}>
       <View style={styles.header}>
         <Text style={styles.title}>{t("Rapports de rentabilité", "تقارير الربحية")}</Text>
         <Text style={styles.subtitle}>{t("Analyse des marges et des flux par période", "تحليل الهوامش والتدفقات حسب الفترة")}</Text>
@@ -438,7 +493,7 @@ export default function ProfitabilityReports({ ready }: { ready: boolean }) {
       ) : activeQuery.isLoading ? (
         <LoadingView />
       ) : tab === "monthly" ? (
-        <MonthlyView rows={monthlyQuery.data ?? []} currency={currency} lang={lang} emptyLabel={t("Aucune donnée pour cette période", "لا توجد بيانات لهذه الفترة")} />
+        <MonthlyView rows={monthlyQuery.data ?? []} currency={currency} lang={lang} emptyLabel={t("Aucune donnée pour cette période", "لا توجد بيانات لهذه الفترة")} onOpenExpenses={openExpenseDetails} />
       ) : tab === "product" ? (
         <ProductView rows={productQuery.data ?? []} currency={currency} lang={lang} emptyLabel={t("Aucun produit pour cette période", "لا توجد منتجات لهذه الفترة")} />
       ) : tab === "customer" ? (
@@ -446,7 +501,191 @@ export default function ProfitabilityReports({ ready }: { ready: boolean }) {
       ) : (
         <SupplierView rows={supplierQuery.data ?? []} currency={currency} lang={lang} emptyLabel={t("Aucun fournisseur pour cette période", "لا يوجد موردون لهذه الفترة")} />
       )}
+      <ExpenseDetailsModal
+        visible={chargePeriod != null}
+        period={chargePeriod}
+        data={expenseQuery.data ?? []}
+        loading={expenseQuery.isLoading}
+        error={expenseQuery.isError}
+        search={chargeSearch}
+        category={chargeCategory}
+        currency={currency}
+        lang={lang}
+        t={t}
+        onSearch={setChargeSearch}
+        onCategory={setChargeCategory}
+        onClose={() => setChargePeriod(null)}
+        onError={(error) => feedback.error(error)}
+      />
     </Screen>
+  );
+}
+
+function csvCell(value: unknown) {
+  const text = String(value ?? "");
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function escapeHtml(value: unknown) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  })[char] ?? char);
+}
+
+function ExpenseDetailsModal({
+  visible, period, data, loading, error, search, category, currency, lang, t,
+  onSearch, onCategory, onClose, onError,
+}: {
+  visible: boolean;
+  period: { month: string; from: string; to: string; storeName: string } | null;
+  data: ExpenseReportItem[];
+  loading: boolean;
+  error: boolean;
+  search: string;
+  category: string;
+  currency: string;
+  lang: "fr" | "ar";
+  t: (fr: string, ar: string) => string;
+  onSearch: (value: string) => void;
+  onCategory: (value: string) => void;
+  onClose: () => void;
+  onError: (error: unknown) => void;
+}) {
+  const normalized = search.trim().toLocaleLowerCase();
+  const categories = [...new Set(data.map((item) => item.category).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const filtered = data.filter((item) => {
+    const matchesCategory = category === "all" || item.category === category;
+    const searchText = `${item.description} ${item.reference ?? ""}`.toLocaleLowerCase();
+    return matchesCategory && (!normalized || searchText.includes(normalized));
+  });
+  const total = filtered.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+
+  async function exportCsv() {
+    if (!period) return;
+    const rows = [
+      [t("Date", "التاريخ"), t("Catégorie", "الفئة"), t("Détail", "التفصيل"), t("Référence", "المرجع"), t("Montant", "المبلغ")],
+      ...filtered.map((item) => [item.createdAt.slice(0, 10), item.category, item.description, item.reference ?? "", Number(item.amount).toFixed(2)]),
+    ];
+    const content = `\uFEFF${rows.map((row) => row.map(csvCell).join(",")).join("\r\n")}`;
+    try {
+      if (Platform.OS === "web") {
+        const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `expenses-${period.from}-${period.to}-${lang}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+        return;
+      }
+      await Share.share({ title: `expenses-${period.from}-${period.to}.csv`, message: content });
+    } catch (exportError) {
+      onError(exportError);
+    }
+  }
+
+  async function printPdf() {
+    if (!period) return;
+    const direction = lang === "ar" ? "rtl" : "ltr";
+    const rows = filtered.map((item) => `
+      <tr>
+        <td>${escapeHtml(item.createdAt.slice(0, 10))}</td>
+        <td>${escapeHtml(item.category)}</td>
+        <td>${escapeHtml(item.description || "—")}</td>
+        <td>${escapeHtml(item.reference || "—")}</td>
+        <td class="amount">${escapeHtml(Number(item.amount).toFixed(2))} ${escapeHtml(currency)}</td>
+      </tr>`).join("");
+    const html = `<!doctype html><html dir="${direction}" lang="${lang}"><head><meta charset="utf-8"><style>
+      body{font-family:Arial,sans-serif;color:#202a36;padding:24px}h1{font-size:20px;margin:0 0 6px}p{color:#637080;margin:0 0 18px}
+      table{width:100%;border-collapse:collapse;font-size:12px}th,td{padding:9px 7px;border-bottom:1px solid #dbe0e5;text-align:start}
+      th{background:#f1f3f5}.amount{font-weight:bold;white-space:nowrap}.total{margin-top:16px;text-align:end;font-weight:bold;color:#b33}
+      </style></head><body><h1>${escapeHtml(t("Détail des charges", "تفاصيل المصاريف"))} — ${escapeHtml(period.month)}</h1>
+      <p>${escapeHtml(period.storeName)} · ${escapeHtml(period.from)} – ${escapeHtml(period.to)}</p>
+      <table><thead><tr><th>${escapeHtml(t("Date", "التاريخ"))}</th><th>${escapeHtml(t("Catégorie", "الفئة"))}</th><th>${escapeHtml(t("Détail", "التفصيل"))}</th><th>${escapeHtml(t("Référence", "المرجع"))}</th><th>${escapeHtml(t("Montant", "المبلغ"))}</th></tr></thead>
+      <tbody>${rows || `<tr><td colspan="5">${escapeHtml(t("Aucune charge", "لا توجد مصاريف"))}</td></tr>`}</tbody></table>
+      <div class="total">${escapeHtml(t("Total", "الإجمالي"))}: ${escapeHtml(total.toFixed(2))} ${escapeHtml(currency)}</div></body></html>`;
+    try {
+      if (Platform.OS === "web") {
+        const printWindow = window.open("", "_blank");
+        if (!printWindow) throw new Error(t("Autorisez les fenêtres contextuelles pour imprimer.", "يرجى السماح بالنوافذ المنبثقة للطباعة."));
+        printWindow.document.open();
+        printWindow.document.write(html);
+        printWindow.document.close();
+        printWindow.focus();
+        printWindow.print();
+        return;
+      }
+      const file = await Print.printToFileAsync({ html });
+      await Sharing.shareAsync(file.uri, { mimeType: "application/pdf", dialogTitle: t("Partager le rapport PDF", "مشاركة تقرير PDF") });
+    } catch (printError) {
+      onError(printError);
+    }
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.expenseBackdrop}>
+        <View style={styles.expenseModal}>
+          <View style={styles.expenseHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.expenseTitle}>{t("Détail des charges", "تفاصيل المصاريف")}{period ? ` — ${period.month}` : ""}</Text>
+              <Text style={styles.expenseSubtitle}>{period ? `${period.from} – ${period.to}` : ""}</Text>
+            </View>
+            <Pressable onPress={onClose} hitSlop={10} accessibilityLabel={t("Fermer", "إغلاق")}>
+              <Feather name="x" size={22} color={colors.textMuted} />
+            </Pressable>
+          </View>
+          <View style={styles.exportButtons}>
+            <Pressable onPress={() => void exportCsv()} disabled={loading || error} style={[styles.exportButton, (loading || error) && styles.exportDisabled]} testID="button-expense-export-csv">
+              <Feather name="share" size={15} color={colors.primary} />
+              <Text style={styles.exportButtonText}>{t("Partager CSV", "مشاركة CSV")}</Text>
+            </Pressable>
+            <Pressable onPress={() => void printPdf()} disabled={loading || error} style={[styles.exportButton, (loading || error) && styles.exportDisabled]} testID="button-expense-print-pdf">
+              <Feather name="printer" size={15} color={colors.primary} />
+              <Text style={styles.exportButtonText}>{t("Imprimer / PDF", "طباعة / PDF")}</Text>
+            </Pressable>
+          </View>
+          <TextInput
+            value={search}
+            onChangeText={onSearch}
+            placeholder={t("Rechercher le détail ou la référence", "ابحث في التفاصيل أو المرجع")}
+            style={styles.expenseSearch}
+            testID="input-expense-search"
+          />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.expenseCategories}>
+            {[{ key: "all", label: t("Toutes", "الكل") }, ...categories.map((value) => ({ key: value, label: value }))].map((item) => (
+              <Pressable key={item.key} onPress={() => onCategory(item.key)} style={[styles.expenseCategory, category === item.key && styles.expenseCategoryActive]}>
+                <Text style={[styles.expenseCategoryText, category === item.key && styles.expenseCategoryTextActive]}>{item.label}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+          {loading ? <LoadingView /> : error ? <ErrorState title={t("Impossible de charger les charges", "تعذر تحميل المصاريف")} /> : (
+            <>
+              <View style={styles.expenseTotalRow}>
+                <Text style={styles.expenseSubtitle}>{filtered.length} / {data.length} {t("résultats", "نتيجة")}</Text>
+                <Text style={styles.expenseTotal}>{t("Total", "الإجمالي")}: {formatAmount(total, currency)}</Text>
+              </View>
+              <KeyboardAwareScrollViewCompat contentContainerStyle={styles.expenseRows} keyboardShouldPersistTaps="handled">
+                {filtered.map((item) => (
+                  <View key={item.id} style={styles.expenseRow}>
+                    <View style={styles.expenseRowTop}>
+                      <Text style={styles.expenseDate}>{item.createdAt.slice(0, 10)}</Text>
+                      <Text style={styles.expenseAmount}>{formatAmount(Number(item.amount), currency)}</Text>
+                    </View>
+                    <Text style={styles.expenseCategoryName}>{item.category}</Text>
+                    <Text style={styles.expenseDescription}>{item.description || "—"}</Text>
+                    {item.reference ? <Text style={styles.expenseReference}>{t("Réf.", "المرجع")}: {item.reference}</Text> : null}
+                  </View>
+                ))}
+                {filtered.length === 0 ? <Text style={styles.muted}>{data.length ? t("Aucun résultat pour ces filtres.", "لا توجد نتائج لهذه الفلاتر.") : t("Aucune charge pour cette période.", "لا توجد مصاريف في هذه الفترة.")}</Text> : null}
+              </KeyboardAwareScrollViewCompat>
+            </>
+          )}
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -495,4 +734,31 @@ const styles = StyleSheet.create({
   barTrack: { flex: 1, height: 14, borderRadius: 5, backgroundColor: colors.border, overflow: "hidden" },
   barFill: { height: "100%", borderRadius: 5, backgroundColor: colors.primary },
   barValue: { width: 78, color: colors.textMuted, fontSize: 10, fontWeight: "700", textAlign: "right" },
+  expenseLink: { minHeight: 38, flexDirection: "row", alignItems: "center", gap: 7, marginTop: 5 },
+  expenseLinkText: { color: colors.primary, fontSize: 12, fontWeight: "700" },
+  expenseBackdrop: { flex: 1, justifyContent: "center", backgroundColor: "rgba(10,20,35,0.48)", padding: 12 },
+  expenseModal: { maxHeight: "94%", borderRadius: 18, backgroundColor: colors.surface, padding: 15 },
+  expenseHeader: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
+  expenseTitle: { color: colors.text, fontSize: 17, fontWeight: "800" },
+  expenseSubtitle: { color: colors.textMuted, fontSize: 11, marginTop: 3 },
+  exportButtons: { flexDirection: "row", gap: 8, marginVertical: 10 },
+  exportButton: { flex: 1, minHeight: 38, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1, borderColor: colors.border, borderRadius: 8, backgroundColor: colors.background },
+  exportDisabled: { opacity: 0.45 },
+  exportButtonText: { color: colors.primary, fontSize: 10, fontWeight: "700" },
+  expenseSearch: { minHeight: 42, borderWidth: 1, borderColor: colors.border, borderRadius: 8, paddingHorizontal: 10, color: colors.text, backgroundColor: colors.background },
+  expenseCategories: { gap: 7, paddingVertical: 9 },
+  expenseCategory: { paddingHorizontal: 11, paddingVertical: 7, borderRadius: 17, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background },
+  expenseCategoryActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  expenseCategoryText: { color: colors.textMuted, fontSize: 10, fontWeight: "600" },
+  expenseCategoryTextActive: { color: colors.surface },
+  expenseTotalRow: { flexDirection: "row", justifyContent: "space-between", gap: 10, borderBottomWidth: 1, borderBottomColor: colors.border, paddingVertical: 8 },
+  expenseTotal: { color: colors.danger, fontSize: 12, fontWeight: "800" },
+  expenseRows: { gap: 8, paddingTop: 8, paddingBottom: 18 },
+  expenseRow: { borderWidth: 1, borderColor: colors.border, borderRadius: 9, padding: 10, gap: 3 },
+  expenseRowTop: { flexDirection: "row", justifyContent: "space-between", gap: 10 },
+  expenseDate: { color: colors.textMuted, fontSize: 10 },
+  expenseAmount: { color: colors.danger, fontSize: 12, fontWeight: "800" },
+  expenseCategoryName: { color: colors.primary, fontSize: 10, fontWeight: "700" },
+  expenseDescription: { color: colors.text, fontSize: 12 },
+  expenseReference: { color: colors.textMuted, fontSize: 10 },
 });

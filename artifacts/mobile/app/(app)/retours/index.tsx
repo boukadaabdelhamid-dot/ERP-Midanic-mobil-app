@@ -33,9 +33,20 @@ export default function RetoursList() {
         emptyTitle={t("Aucun retour", "لا توجد مرتجعات")}
         renderItem={(r: any) => (
           <EntityRow
-            title={`#${r.id} · ${r.originalOrderId ? `Commande #${r.originalOrderId}` : r.clientName ?? ""}`}
+            onPress={() => router.push(`/retours/${r.id}` as never)}
+            testID={`button-retour-details-${r.id}`}
+            title={`#${r.id} · ${r.originalOrderId ? `${t("Commande", "طلب")} #${r.originalOrderId}` : r.clientName ?? ""}`}
             subtitle={`${Number(r.totalAmount ?? 0).toLocaleString("fr-FR")} ${currency}`}
-            right={<Badge label={r.retourType ?? "—"} />}
+            right={
+              <Badge
+                label={r.retourType === "remboursement"
+                  ? t("Remboursement", "استرداد")
+                  : r.retourType === "sans_remboursement"
+                    ? t("Sans remboursement", "بدون استرداد")
+                    : r.retourType ?? "—"}
+                tone={r.retourType === "remboursement" ? "info" : "muted"}
+              />
+            }
           />
         )}
       />

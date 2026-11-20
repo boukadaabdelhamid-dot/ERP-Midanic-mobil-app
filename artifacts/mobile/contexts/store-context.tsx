@@ -1,14 +1,19 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import type { Store } from "@workspace/api-client-react";
+import type { Store as ApiStore } from "@workspace/api-client-react";
 
 const STORE_KEY = "midanic.erp.currentStoreId";
 
+export type MobileStore = ApiStore & {
+  kind?: "store" | "factory";
+  navigationColor?: string | null;
+};
+
 type StoreContextType = {
   currentStoreId: number | null;
-  stores: Store[];
+  stores: MobileStore[];
   isReady: boolean;
-  setStores: (stores: Store[], currentStoreId: number | null) => void;
+  setStores: (stores: MobileStore[], currentStoreId: number | null) => void;
   setCurrentStoreId: (id: number | null) => void;
   clear: () => void;
 };
@@ -16,7 +21,7 @@ type StoreContextType = {
 const StoreContext = createContext<StoreContextType | null>(null);
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
-  const [stores, setStoresState] = useState<Store[]>([]);
+  const [stores, setStoresState] = useState<MobileStore[]>([]);
   const [currentStoreId, setCurrentStoreIdState] = useState<number | null>(null);
   const [isReady, setIsReady] = useState(false);
 
@@ -28,7 +33,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     })();
   }, []);
 
-  const setStores = useCallback((s: Store[], cur: number | null) => {
+  const setStores = useCallback((s: MobileStore[], cur: number | null) => {
     setStoresState(s);
     if (cur != null) {
       AsyncStorage.setItem(STORE_KEY, String(cur));

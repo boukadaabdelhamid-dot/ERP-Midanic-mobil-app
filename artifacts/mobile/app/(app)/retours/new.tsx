@@ -116,7 +116,7 @@ export default function NewRetour() {
 
   return (
     <Screen>
-      <Card>
+      <Card style={styles.formCard}>
         <SectionTitle>{t("Client", "العميل")}</SectionTitle>
         <PickerField<CustomerSummary>
           label={t("Client (optionnel)", "العميل (اختياري)")}
@@ -130,7 +130,7 @@ export default function NewRetour() {
         />
       </Card>
 
-      <Card>
+      <Card style={styles.formCard}>
         <SectionTitle>{t("Produits retournés", "المنتجات المسترجعة")}</SectionTitle>
         <PickerField<Product>
           label={t("Ajouter un produit", "إضافة منتج")}
@@ -145,7 +145,10 @@ export default function NewRetour() {
         />
 
         {cart.length === 0 ? (
-          <Text style={styles.muted}>{t("Aucun produit ajouté", "لم تتم إضافة أي منتج")}</Text>
+          <View style={styles.emptyCart}>
+            <Feather name="package" size={18} color={colors.textMuted} />
+            <Text style={styles.muted}>{t("Aucun produit ajouté", "لم تتم إضافة أي منتج")}</Text>
+          </View>
         ) : (
           cart.map((line, i) => (
             <View key={line.product.id}>
@@ -160,7 +163,7 @@ export default function NewRetour() {
                   </Text>
                 </View>
                 <QuantityStepper value={line.quantity} onChange={(q) => updateQuantity(line.product.id, q)} />
-                <Pressable onPress={() => removeLine(line.product.id)} hitSlop={8} testID={`button-remove-line-${line.product.id}`}>
+                <Pressable onPress={() => removeLine(line.product.id)} style={styles.removeButton} hitSlop={8} testID={`button-remove-line-${line.product.id}`}>
                   <Feather name="trash-2" size={18} color={colors.danger} />
                 </Pressable>
               </View>
@@ -169,7 +172,7 @@ export default function NewRetour() {
         )}
       </Card>
 
-      <Card>
+      <Card style={styles.formCard}>
         <SectionTitle>{t("Détails", "التفاصيل")}</SectionTitle>
         <View style={[styles.paymentRow, isRTL && styles.cartRowRTL]}>
           <Button
@@ -206,13 +209,16 @@ export default function NewRetour() {
 }
 
 const styles = StyleSheet.create({
+  formCard: { borderTopWidth: 2, borderTopColor: colors.accent },
   muted: { fontSize: 13, color: colors.textMuted, marginTop: 4 },
-  cartRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 8 },
+  emptyCart: { minHeight: 64, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 8, backgroundColor: colors.background },
+  cartRow: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 62, paddingVertical: 10 },
   cartRowRTL: { flexDirection: "row-reverse" },
   cartName: { fontSize: 14, fontWeight: "600", color: colors.text },
   cartSub: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  removeButton: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
   paymentRow: { flexDirection: "row", gap: 10, marginBottom: 4 },
-  totalRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 4 },
+  totalRow: { minHeight: 52, flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4, paddingHorizontal: 12, borderRadius: 8, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.accent },
   totalLabel: { fontSize: 15, fontWeight: "600", color: colors.text },
   totalValue: { fontSize: 18, fontWeight: "700", color: colors.primary },
 });

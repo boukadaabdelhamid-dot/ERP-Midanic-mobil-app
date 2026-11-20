@@ -20,6 +20,16 @@ export type TransferStatusValue =
 
 export type TransferAction = "approve" | "reject" | "prepare" | "ship" | "receive" | "cancel";
 
+/** Missing receipt data is unknown, not zero and not the sent quantity. */
+export function getTransferQuantities(item: { quantity: number; receivedQuantity?: number | null }) {
+  const received = item.receivedQuantity ?? null;
+  return {
+    sent: item.quantity,
+    received,
+    missing: received == null ? null : Math.max(0, Number((item.quantity - received).toPrecision(12))),
+  };
+}
+
 export type TransferStatusAction = {
   action: TransferAction;
   label: string;

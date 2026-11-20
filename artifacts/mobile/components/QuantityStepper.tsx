@@ -39,17 +39,17 @@ export function QuantityStepper({
 }
 
 const styles = StyleSheet.create({
-  wrap: { flexDirection: "row", alignItems: "center", gap: 10 },
+  wrap: { flexDirection: "row", alignItems: "center", gap: 6 },
   wrapRTL: { flexDirection: "row-reverse" },
   btn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 40,
+    height: 40,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.surface,
   },
-  value: { fontSize: 15, fontWeight: "700", color: colors.text, minWidth: 22, textAlign: "center" },
+  value: { fontSize: 15, fontWeight: "700", color: colors.text, minWidth: 24, textAlign: "center" },
 });
