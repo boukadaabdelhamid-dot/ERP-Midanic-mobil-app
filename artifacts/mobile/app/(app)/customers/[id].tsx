@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { Feather } from "@expo/vector-icons";
 import {
   useGetErpCustomer,
   useGetCustomerOperations,
@@ -10,9 +11,9 @@ import {
   getGetAdminRetoursQueryKey,
 } from "@workspace/api-client-react";
 import { useProtectedRoute } from "@/hooks/use-protected-route";
-import { useLang } from "@/contexts/lang-context";
+import { localeForLanguage, useLang, type ErpLang } from "@/contexts/lang-context";
 import { Screen } from "@/components/Screen";
-import { Card, LoadingView, SectionTitle, Divider, ErrorState } from "@/components/ui";
+import { Button, Card, LoadingView, SectionTitle, Divider, ErrorState } from "@/components/ui";
 import { colors } from "@/lib/colors";
 import { getContactBalance } from "@/lib/contact-balance";
 import { ContactHistoryRow } from "@/components/ContactHistoryRow";
@@ -25,33 +26,71 @@ export default function CustomerDetail() {
   const currency = lang === "ar" ? "دج" : "DA";
   const customerId = Number(id);
   const canViewOrders = isAdmin || can("orders", "view");
+  const canRefund = isAdmin || can("customers", "edit");
+  const [ordersLimit, setOrdersLimit] = useState(20);
+  const [operationsLimit, setOperationsLimit] = useState(50);
+  const [retoursLimit, setRetoursLimit] = useState(20);
+  const customerParams = { ordersLimit, includeNotes: false };
+  const operationsParams = { order: "desc" as const, limit: operationsLimit };
+  const retourParams = { clientUserId: customerId, limit: retoursLimit };
 
-  const { data: customer, isLoading, isError } = useGetErpCustomer(customerId, {
-    query: { enabled: ready && !!customerId, queryKey: getGetErpCustomerQueryKey(customerId) },
+  const { data: customer, isLoading, isError, isFetching, refetch: refetchCustomer } = useGetErpCustomer(customerId, {
+    params: customerParams,
+    query: {
+      enabled: ready && !!customerId,
+      queryKey: getGetErpCustomerQueryKey(customerId, customerParams),
+      staleTime: 90_000,
+      placeholderData: (previousData) => previousData,
+    },
   });
-  const { data: ops } = useGetCustomerOperations(customerId, undefined, {
-    query: { enabled: ready && !!customerId, queryKey: getGetCustomerOperationsQueryKey(customerId) },
+  const {
+    data: ops,
+    isLoading: operationsLoading,
+    isError: operationsError,
+    isFetching: operationsFetching,
+    refetch: refetchOperations,
+  } = useGetCustomerOperations(customerId, operationsParams, {
+    query: {
+      enabled: ready && !!customerId,
+      queryKey: getGetCustomerOperationsQueryKey(customerId, operationsParams),
+      staleTime: 90_000,
+      placeholderData: (previousData) => previousData,
+    },
   });
-  const { data: allRetours } = useGetAdminRetours({
+  const {
+    data: retours,
+    isLoading: retoursLoading,
+    isError: retoursError,
+    isFetching: retoursFetching,
+    refetch: refetchRetours,
+  } = useGetAdminRetours(retourParams, {
     query: {
       enabled: ready && !!customerId && canViewOrders,
-      queryKey: getGetAdminRetoursQueryKey(),
+      queryKey: getGetAdminRetoursQueryKey(retourParams),
+      staleTime: 90_000,
+      placeholderData: (previousData) => previousData,
     },
   });
 
   if (!ready) return null;
   if (isLoading) return <LoadingView />;
-  if (isError || !customer) return <ErrorState title={t("Client introuvable", "العميل غير موجود")} />;
+  if (isError || !customer) {
+    return (
+      <View>
+        <ErrorState title={t("Impossible de charger le client", "تعذر تحميل الزبون")} />
+        <Button
+          label={t("Réessayer", "إعادة المحاولة")}
+          onPress={() => { void refetchCustomer(); }}
+          loading={isFetching}
+          testID="button-retry-customer-detail"
+        />
+      </View>
+    );
+  }
 
   const c = customer as any;
   const balance = getContactBalance(c);
   const orders = Array.isArray(c.orders) ? c.orders : [];
-  const orderIds = new Set(orders.map((order: any) => Number(order.id)));
-  const retours = ((allRetours ?? []) as any[]).filter(
-    (retour) =>
-      Number(retour.clientUserId) === customerId ||
-      (retour.originalOrderId != null && orderIds.has(Number(retour.originalOrderId))),
-  );
   const operations = Array.isArray(ops) ? (ops as any[]) : [];
 
   return (
@@ -73,6 +112,15 @@ export default function CustomerDetail() {
         </Text>
       </Card>
 
+      {canRefund ? (
+        <Button
+          label={t("Rembourser le client", "دفع استرداد للزبون")}
+          icon={<Feather name="corner-up-left" size={17} color={colors.surface} />}
+          onPress={() => router.push(`/customers/${customerId}/refund` as never)}
+          testID="button-customer-refund"
+        />
+      ) : null}
+
       <Card>
         <SectionTitle>{t("Historique des ventes", "سجل المبيعات")}</SectionTitle>
         {orders.length === 0 ? (
@@ -90,13 +138,45 @@ export default function CustomerDetail() {
             </View>
           ))
         )}
+        {ordersLimit > 0 && orders.length >= ordersLimit && ordersLimit < 100 ? (
+          <Button
+            label={t("Charger plus de ventes", "تحميل مبيعات إضافية")}
+            variant="secondary"
+            onPress={() => setOrdersLimit((limit) => Math.min(limit + 20, 100))}
+            loading={isFetching}
+            disabled={isFetching}
+            testID="button-load-more-customer-orders"
+          />
+        ) : null}
+        {ordersLimit === 100 && orders.length >= 100 ? (
+          <Button
+            label={t("Charger tout l’historique", "تحميل سجل المبيعات كاملًا")}
+            variant="secondary"
+            onPress={() => setOrdersLimit(0)}
+            loading={isFetching}
+            disabled={isFetching}
+            testID="button-load-all-customer-orders"
+          />
+        ) : null}
       </Card>
 
       <Card>
         <SectionTitle>{t("Retours", "المرتجعات")}</SectionTitle>
         {!canViewOrders ? (
           <Text style={styles.muted}>{t("Permission ventes requise", "تحتاج إلى صلاحية عرض المبيعات")}</Text>
-        ) : retours.length === 0 ? (
+        ) : retoursLoading ? (
+          <Text style={styles.muted}>{t("Chargement...", "جار التحميل...")}</Text>
+        ) : retoursError ? (
+          <View>
+            <Text style={styles.muted}>{t("Impossible de charger les retours.", "تعذر تحميل المرتجعات.")}</Text>
+            <Button
+              label={t("Réessayer", "إعادة المحاولة")}
+              variant="secondary"
+              onPress={() => { void refetchRetours(); }}
+              testID="button-retry-customer-returns"
+            />
+          </View>
+        ) : !Array.isArray(retours) || retours.length === 0 ? (
           <Text style={styles.muted}>{t("Aucun retour", "لا توجد مرتجعات")}</Text>
         ) : (
           retours.map((retour: any, index: number) => (
@@ -111,14 +191,46 @@ export default function CustomerDetail() {
             </View>
           ))
         )}
+        {Array.isArray(retours) && retoursLimit > 0 && retours.length >= retoursLimit && retoursLimit < 100 ? (
+          <Button
+            label={t("Charger plus de retours", "تحميل مرتجعات إضافية")}
+            variant="secondary"
+            onPress={() => setRetoursLimit((limit) => Math.min(limit + 20, 100))}
+            loading={retoursFetching}
+            disabled={retoursFetching}
+            testID="button-load-more-customer-returns"
+          />
+        ) : null}
+        {Array.isArray(retours) && retoursLimit === 100 && retours.length >= 100 ? (
+          <Button
+            label={t("Charger tout l’historique", "تحميل سجل المرتجعات كاملًا")}
+            variant="secondary"
+            onPress={() => setRetoursLimit(0)}
+            loading={retoursFetching}
+            disabled={retoursFetching}
+            testID="button-load-all-customer-returns"
+          />
+        ) : null}
       </Card>
 
       <Card>
         <SectionTitle>{t("Paiements et opérations", "الدفعات والعمليات")}</SectionTitle>
-        {operations.length === 0 ? (
+        {operationsLoading ? (
+          <Text style={styles.muted}>{t("Chargement...", "جار التحميل...")}</Text>
+        ) : operationsError ? (
+          <View>
+            <Text style={styles.muted}>{t("Impossible de charger les opérations.", "تعذر تحميل العمليات.")}</Text>
+            <Button
+              label={t("Réessayer", "إعادة المحاولة")}
+              variant="secondary"
+              onPress={() => { void refetchOperations(); }}
+              testID="button-retry-customer-operations"
+            />
+          </View>
+        ) : operations.length === 0 ? (
           <Text style={styles.muted}>{t("Aucune opération", "لا توجد عمليات")}</Text>
         ) : (
-          operations.slice(0, 50).map((op: any, index: number) => (
+          operations.map((op: any, index: number) => (
             <View key={op.id ?? index}>
               {index > 0 ? <Divider /> : null}
               <ContactHistoryRow
@@ -136,16 +248,36 @@ export default function CustomerDetail() {
             </View>
           ))
         )}
+        {operationsLimit > 0 && operations.length >= operationsLimit && operationsLimit < 200 ? (
+          <Button
+            label={t("Charger plus d’opérations", "تحميل عمليات إضافية")}
+            variant="secondary"
+            onPress={() => setOperationsLimit((limit) => Math.min(limit + 50, 200))}
+            loading={operationsFetching}
+            disabled={operationsFetching}
+            testID="button-load-more-customer-operations"
+          />
+        ) : null}
+        {operationsLimit === 200 && operations.length >= 200 ? (
+          <Button
+            label={t("Charger toutes les opérations", "تحميل كل العمليات")}
+            variant="secondary"
+            onPress={() => setOperationsLimit(0)}
+            loading={operationsFetching}
+            disabled={operationsFetching}
+            testID="button-load-all-customer-operations"
+          />
+        ) : null}
       </Card>
     </Screen>
   );
 }
 
-function formatDate(value: string | undefined, lang: string) {
+function formatDate(value: string | undefined, lang: ErpLang) {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString(lang === "ar" ? "ar-DZ" : "fr-FR");
+  return date.toLocaleDateString(localeForLanguage(lang));
 }
 
 function returnTypeLabel(type: string | null | undefined, t: (fr: string, ar: string) => string) {

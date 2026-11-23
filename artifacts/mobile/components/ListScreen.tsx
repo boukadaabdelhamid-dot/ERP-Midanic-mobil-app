@@ -37,6 +37,7 @@ export function ListScreen<T>({
   emptyTitle,
   emptySubtitle,
   header,
+  footer,
   onRefresh,
   refreshing,
   onEndReached,
@@ -48,6 +49,7 @@ export function ListScreen<T>({
   emptyTitle: string;
   emptySubtitle?: string;
   header?: React.ReactElement;
+  footer?: React.ReactElement;
   onRefresh?: () => void;
   refreshing?: boolean;
   onEndReached?: () => void;
@@ -59,8 +61,10 @@ export function ListScreen<T>({
       keyExtractor={keyExtractor}
       renderItem={({ item }) => renderItem(item)}
       ListHeaderComponent={header}
+      ListFooterComponent={footer}
       ListEmptyComponent={<EmptyState title={emptyTitle} subtitle={emptySubtitle} />}
       contentContainerStyle={styles.listContent}
+      scrollEnabled={(data?.length ?? 0) > 0}
       onRefresh={onRefresh}
       refreshing={!!refreshing}
       onEndReached={onEndReached}

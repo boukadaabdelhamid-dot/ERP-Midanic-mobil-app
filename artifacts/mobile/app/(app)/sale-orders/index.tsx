@@ -92,7 +92,7 @@ export default function SaleOrdersList() {
     const prefix = order.order_source === "pos" ? "VR" : "BV";
     const ref = `${prefix}-${String(order.id).padStart(5, "0")}`;
     const ok = await confirm({
-      title: t(`Clôturer ${ref} ?`, `إغلاق ${ref}؟`),
+      title: t(`Clôturer ${ref} ?`, `إغلاق ${ref}؟`, `Close ${ref}?`),
       message: t(
         "Le stock sera déduit et le paiement enregistré.",
         "سيتم خصم المخزون وتسجيل الدفع."

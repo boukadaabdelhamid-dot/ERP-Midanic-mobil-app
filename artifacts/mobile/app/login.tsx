@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { View, Text, Image, StyleSheet, KeyboardAvoidingView, Platform, Pressable, Switch } from "react-native";
 import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
@@ -31,7 +31,7 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricEnabled, setBiometricEnabledState] = useState(false);
-  const [biometricAttempted, setBiometricAttempted] = useState(false);
+  const biometricAttempted = useRef(false);
   const [biometricPending, setBiometricPending] = useState(false);
 
   useEffect(() => {
@@ -49,15 +49,53 @@ export default function Login() {
   }, []);
 
   useEffect(() => {
-    if (!token || !biometricAvailable || !biometricEnabled || biometricAttempted) return;
-    setBiometricAttempted(true);
+    if (!token || !biometricAvailable || !biometricEnabled || biometricAttempted.current) return;
+    biometricAttempted.current = true;
     setBiometricPending(true);
-    authenticateWithBiometric()
+    void authenticateWithBiometric(
+      t("Déverrouiller Midanic", "افتح تطبيق ميدانيك"),
+      t("Annuler", "إلغاء"),
+      t("Utiliser le mot de passe", "استخدم كلمة المرور"),
+    )
       .then((success) => {
-        if (success) router.replace("/home");
+        if (success && biometricEnabled) {
+          void getBiometricEnabled().then((stillEnabled) => {
+            if (stillEnabled) router.replace("/home");
+          });
+        }
       })
+      .catch(() => undefined)
       .finally(() => setBiometricPending(false));
-  }, [token, biometricAvailable, biometricEnabled, biometricAttempted, router]);
+  }, [token, biometricAvailable, biometricEnabled, router, t]);
+
+  async function handleBiometricToggle(enabled: boolean) {
+    setError(null);
+    if (!token) {
+      setBiometricEnabledState(enabled);
+      return;
+    }
+    setBiometricPending(true);
+    try {
+      if (enabled) {
+        const verified = await authenticateWithBiometric(
+          t("Confirmez l'activation de la biométrie", "أكد تفعيل الدخول بالبصمة"),
+          t("Annuler", "إلغاء"),
+          t("Utiliser le mot de passe", "استخدم كلمة المرور"),
+        );
+        if (!verified) {
+          setError(t("La vérification a été annulée.", "تم إلغاء التحقق بالبصمة."));
+          return;
+        }
+        biometricAttempted.current = true;
+      }
+      await setBiometricEnabled(enabled);
+      setBiometricEnabledState(enabled);
+    } catch {
+      setError(t("Impossible d'enregistrer le réglage biométrique.", "تعذر حفظ إعداد البصمة."));
+    } finally {
+      setBiometricPending(false);
+    }
+  }
 
   const onSubmit = () => {
     setError(null);
@@ -78,6 +116,7 @@ export default function Login() {
             );
             return;
           }
+          biometricAttempted.current = true;
           await setBiometricEnabled(biometricAvailable && biometricEnabled);
           await setToken(res.token);
           clear();
@@ -177,7 +216,8 @@ export default function Login() {
               </View>
               <Switch
                 value={biometricEnabled}
-                onValueChange={setBiometricEnabledState}
+                onValueChange={handleBiometricToggle}
+                disabled={biometricPending || loginMutation.isPending}
                 accessibilityLabel={t("Activer la connexion biométrique", "تفعيل الدخول بالبصمة")}
                 testID="switch-biometric-login"
               />
@@ -188,9 +228,17 @@ export default function Login() {
               label={biometricPending ? t("Vérification...", "جارٍ التحقق...") : t("Se connecter avec la biométrie", "الدخول بالبصمة")}
               onPress={async () => {
                 setBiometricPending(true);
-                const success = await authenticateWithBiometric();
-                setBiometricPending(false);
-                if (success) router.replace("/home");
+                try {
+                  const success = await authenticateWithBiometric(
+                    t("Déverrouiller Midanic", "افتح تطبيق ميدانيك"),
+                    t("Annuler", "إلغاء"),
+                    t("Utiliser le mot de passe", "استخدم كلمة المرور"),
+                  );
+                  if (success) router.replace("/home");
+                  else setError(t("La vérification biométrique n'a pas abouti.", "لم يكتمل التحقق بالبصمة."));
+                } finally {
+                  setBiometricPending(false);
+                }
               }}
               loading={biometricPending}
               variant="secondary"
@@ -202,7 +250,7 @@ export default function Login() {
         </View>
 
         <Button
-          label={lang === "ar" ? "Français" : "العربية"}
+          label={lang === "ar" ? "English" : lang === "en" ? "Français" : "العربية"}
           onPress={toggleLanguage}
           variant="ghost"
           style={{ marginTop: 16 }}

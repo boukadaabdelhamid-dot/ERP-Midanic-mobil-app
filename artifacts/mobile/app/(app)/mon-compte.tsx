@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useQueryClient } from "@tanstack/react-query";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import {
   getGetErpAccountMeQueryKey,
   getGetErpCaissesQueryKey,
@@ -15,13 +15,19 @@ import {
   useRejectErpCaisseTransfer,
 } from "@workspace/api-client-react";
 import { useProtectedRoute } from "@/hooks/use-protected-route";
-import { useLang } from "@/contexts/lang-context";
+import { localeForLanguage, useLang, type ErpLang } from "@/contexts/lang-context";
 import { useMe } from "@/hooks/use-me";
 import { useApiFeedback } from "@/hooks/use-api-feedback";
 import { useConfirm } from "@/contexts/confirm-context";
 import { Screen } from "@/components/Screen";
 import { Card, LoadingView, Badge } from "@/components/ui";
 import { colors } from "@/lib/colors";
+import {
+  authenticateWithBiometric,
+  getBiometricEnabled,
+  isBiometricAvailable,
+  setBiometricEnabled,
+} from "@/lib/biometric-auth";
 
 type TransferBox = "inbox" | "outbox" | "all";
 const CASH_ACCENT = "#C56A00";
@@ -47,13 +53,14 @@ function money(value: unknown, currency: string) {
   })} ${currency}`;
 }
 
-function transferDate(value: string | undefined) {
+function transferDate(value: string | undefined, lang: ErpLang) {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
-  return `${date.toLocaleString("en-US", { month: "short" })}\n${date.toLocaleString("en-US", {
+  const locale = localeForLanguage(lang);
+  return `${date.toLocaleString(locale, { month: "short" })}\n${date.toLocaleString(locale, {
     day: "2-digit",
-  })}\n${date.toLocaleString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })}`;
+  })}\n${date.toLocaleString(locale, { hour: "2-digit", minute: "2-digit", hour12: false })}`;
 }
 
 function personOrCaisse(caisse: any, t: (fr: string, ar: string) => string) {
@@ -71,7 +78,23 @@ export default function MonCompte() {
   const { confirm } = useConfirm();
   const queryClient = useQueryClient();
   const [box, setBox] = useState<TransferBox>("inbox");
+  const [biometricAvailable, setBiometricAvailable] = useState<boolean | null>(null);
+  const [biometricEnabled, setBiometricEnabledState] = useState(false);
+  const [biometricSaving, setBiometricSaving] = useState(false);
+  const [biometricMessage, setBiometricMessage] = useState("");
   const currency = lang === "ar" ? "دج" : "DA";
+
+  useEffect(() => {
+    let active = true;
+    void Promise.all([isBiometricAvailable(), getBiometricEnabled()]).then(([available, enabled]) => {
+      if (!active) return;
+      setBiometricAvailable(available);
+      setBiometricEnabledState(available && enabled);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const { data: account, isLoading: accountLoading } = useGetErpAccountMe({
     query: { enabled: ready, queryKey: getGetErpAccountMeQueryKey() },
@@ -164,6 +187,40 @@ export default function MonCompte() {
     );
   }
 
+  async function handleBiometricToggle(enabled: boolean) {
+    if (biometricSaving) return;
+    setBiometricSaving(true);
+    setBiometricMessage("");
+    try {
+      if (enabled) {
+        const verified = await authenticateWithBiometric(
+          t("Confirmez l'activation de la biométrie", "أكد تفعيل الدخول بالبصمة"),
+          t("Annuler", "إلغاء"),
+          t("Utiliser le mot de passe", "استخدم كلمة المرور"),
+        );
+        if (!verified) {
+          setBiometricMessage(
+            t("La vérification n'a pas abouti. La biométrie reste désactivée.", "لم يكتمل التحقق، لذلك بقي الدخول بالبصمة معطلًا."),
+          );
+          return;
+        }
+      }
+      await setBiometricEnabled(enabled);
+      setBiometricEnabledState(enabled);
+      feedback.success(
+        enabled ? "Connexion biométrique activée" : "Connexion biométrique désactivée",
+        enabled ? "تم تفعيل الدخول بالبصمة" : "تم إيقاف الدخول بالبصمة",
+      );
+    } catch (error) {
+      setBiometricMessage(
+        t("Impossible d'enregistrer ce réglage. Réessayez.", "تعذر حفظ إعداد البصمة. حاول مجددًا."),
+      );
+      feedback.error(error);
+    } finally {
+      setBiometricSaving(false);
+    }
+  }
+
   return (
     <Screen contentContainerStyle={styles.screenContent}>
       <View style={styles.pageIntro}>
@@ -208,6 +265,45 @@ export default function MonCompte() {
           <Feather name="key" size={20} color={colors.text} />
           <Text style={styles.passwordText}>{t("Changer le mot de passe", "تغيير كلمة المرور")}</Text>
         </Pressable>
+      </Card>
+
+      <Card style={styles.biometricCard}>
+        <View style={styles.biometricRow}>
+          <View style={styles.biometricCopy}>
+            <Feather name="shield" size={21} color={colors.primary} />
+            <View style={styles.biometricTextBlock}>
+              <Text style={styles.biometricTitle}>{t("Connexion biométrique", "الدخول بالبصمة")}</Text>
+              <Text style={styles.biometricSubtitle}>
+                {t(
+                  "Demandez une vérification biométrique à la réouverture de l'application.",
+                  "اطلب التحقق بالبصمة عند إعادة فتح التطبيق.",
+                )}
+              </Text>
+            </View>
+          </View>
+          {biometricAvailable ? (
+            <Switch
+              value={biometricEnabled}
+              onValueChange={handleBiometricToggle}
+              disabled={biometricSaving}
+              accessibilityLabel={t("Activer la connexion biométrique", "تفعيل الدخول بالبصمة")}
+              testID="switch-account-biometric-login"
+              trackColor={{ false: colors.border, true: colors.primary }}
+              thumbColor={colors.surface}
+            />
+          ) : null}
+        </View>
+        {biometricAvailable === null ? (
+          <Text style={styles.biometricHint}>{t("Vérification de l'appareil...", "جارٍ التحقق من الجهاز...")}</Text>
+        ) : biometricAvailable === false ? (
+          <Text style={styles.biometricHint}>
+            {t(
+              "Aucune empreinte ou reconnaissance faciale n'est configurée sur cet appareil.",
+              "لا توجد بصمة أو ميزة تعرّف على الوجه مفعّلة في هذا الجهاز.",
+            )}
+          </Text>
+        ) : null}
+        {biometricMessage ? <Text style={styles.biometricError}>{biometricMessage}</Text> : null}
       </Card>
 
       <Card style={styles.cashCard}>
@@ -286,7 +382,7 @@ export default function MonCompte() {
                   return (
                     <View key={tr.id} style={styles.tableRow}>
                       <TableCell label={`#${tr.id}`} width={48} />
-                      <TableCell label={transferDate(tr.createdAt)} width={86} multiline />
+                      <TableCell label={transferDate(tr.createdAt, lang)} width={86} multiline />
                       <TableCell label={sender} width={150} multiline />
                       <TableCell label={recipient} width={150} multiline />
                       <TableCell label={money(tr.amount, currency)} width={132} align="right" strong multiline />
@@ -414,42 +510,50 @@ function TableAction({
 }
 
 const styles = StyleSheet.create({
-  screenContent: { padding: 20, paddingBottom: 40, gap: 20 },
+  screenContent: { paddingHorizontal: 18, paddingTop: 18, paddingBottom: 32, gap: 16 },
   pageIntro: { gap: 2 },
-  pageTitleRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-  pageTitle: { color: colors.primary, fontSize: 29, fontWeight: "700" },
-  pageSubtitle: { color: colors.textMuted, fontSize: 16, lineHeight: 23 },
-  profileCard: { padding: 30, borderRadius: 15, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
-  sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
-  sectionHeading: { flexDirection: "row", alignItems: "center", gap: 12 },
-  sectionTitle: { color: colors.text, fontSize: 19, fontWeight: "700" },
-  linkButton: { flexDirection: "row", alignItems: "center", gap: 8, padding: 4 },
-  linkText: { color: colors.textMuted, fontSize: 14, fontWeight: "600" },
-  profileRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, paddingVertical: 6 },
+  pageTitleRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  pageTitle: { color: colors.primary, fontSize: 24, lineHeight: 30, fontWeight: "700" },
+  pageSubtitle: { color: colors.textMuted, fontSize: 14, lineHeight: 20 },
+  profileCard: { padding: 20, borderRadius: 15, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
+  sectionHeading: { flexDirection: "row", alignItems: "center", gap: 10 },
+  sectionTitle: { color: colors.text, fontSize: 17, lineHeight: 23, fontWeight: "700" },
+  linkButton: { flexDirection: "row", alignItems: "center", gap: 6, padding: 4 },
+  linkText: { color: colors.textMuted, fontSize: 13, fontWeight: "600" },
+  profileRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, paddingVertical: 5 },
   profileLabelRow: { flexDirection: "row", alignItems: "center", gap: 6, flex: 1 },
-  profileLabel: { color: colors.textMuted, fontSize: 16 },
-  profileValue: { color: colors.text, fontSize: 16, fontWeight: "600", textAlign: "right", flex: 1.75 },
-  passwordButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 14, borderWidth: 1, borderColor: colors.border, borderRadius: 7, paddingVertical: 11, marginTop: 15 },
-  passwordText: { color: colors.text, fontSize: 14, fontWeight: "600" },
-  cashCard: { backgroundColor: "#FFFCF5", borderColor: "#F5DF65", borderWidth: 2, padding: 30, borderRadius: 15 },
-  cashTitleRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-  cashTitle: { color: colors.text, fontSize: 19, fontWeight: "700" },
-  cashBalance: { color: "#C55F08", fontSize: 39, lineHeight: 48, fontWeight: "800", marginTop: 14 },
-  cashSubtitle: { color: colors.textMuted, fontSize: 15, marginTop: 2 },
-  sendButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12, backgroundColor: colors.primary, borderRadius: 6, paddingVertical: 11, paddingHorizontal: 16, alignSelf: "flex-start", marginTop: 16 },
-  sendButtonText: { color: "#fff", fontSize: 15, fontWeight: "700" },
-  transferSection: { gap: 12 },
+  profileLabel: { color: colors.textMuted, fontSize: 14, lineHeight: 20 },
+  profileValue: { color: colors.text, fontSize: 14, lineHeight: 20, fontWeight: "600", textAlign: "right", flex: 1.75 },
+  passwordButton: { minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, borderWidth: 1, borderColor: colors.border, borderRadius: 7, paddingVertical: 9, paddingHorizontal: 10, marginTop: 12 },
+  passwordText: { color: colors.text, fontSize: 13, fontWeight: "600" },
+  biometricCard: { gap: 10, padding: 14 },
+  biometricRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 14 },
+  biometricCopy: { flexDirection: "row", alignItems: "flex-start", gap: 10, flex: 1 },
+  biometricTextBlock: { flex: 1, gap: 3 },
+  biometricTitle: { color: colors.text, fontSize: 14, lineHeight: 19, fontWeight: "700" },
+  biometricSubtitle: { color: colors.textMuted, fontSize: 12, lineHeight: 18 },
+  biometricHint: { color: colors.textMuted, fontSize: 12, lineHeight: 18 },
+  biometricError: { color: colors.danger, fontSize: 12, lineHeight: 18 },
+  cashCard: { backgroundColor: "#FFFCF5", borderColor: "#F5DF65", borderWidth: 2, padding: 20, borderRadius: 15 },
+  cashTitleRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  cashTitle: { color: colors.text, fontSize: 17, lineHeight: 23, fontWeight: "700" },
+  cashBalance: { color: "#C55F08", fontSize: 29, lineHeight: 38, letterSpacing: -0.35, fontWeight: "800", marginTop: 11 },
+  cashSubtitle: { color: colors.textMuted, fontSize: 13, marginTop: 2 },
+  sendButton: { minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.primary, borderRadius: 6, paddingVertical: 9, paddingHorizontal: 13, alignSelf: "flex-start", marginTop: 13 },
+  sendButtonText: { color: "#fff", fontSize: 14, fontWeight: "700" },
+  transferSection: { gap: 10 },
   tabs: { flexDirection: "row", backgroundColor: "#EEF0EE", borderRadius: 8, padding: 4, gap: 2 },
-  tab: { flex: 1, minHeight: 42, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingHorizontal: 6, borderRadius: 6 },
+  tab: { flex: 1, minHeight: 40, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, paddingHorizontal: 4, borderRadius: 6 },
   activeTab: { backgroundColor: colors.surface, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
-  tabText: { color: colors.textMuted, fontSize: 15, fontWeight: "600" },
+  tabText: { color: colors.textMuted, fontSize: 13, fontWeight: "600" },
   activeTabText: { color: colors.text },
   tableCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 13, overflow: "hidden" },
   table: { minWidth: 804 },
   tableRow: { flexDirection: "row", minHeight: 72, borderBottomWidth: 1, borderBottomColor: colors.border },
   tableHeader: { minHeight: 50, backgroundColor: "#FAFAFA" },
   tableCell: { justifyContent: "center", paddingHorizontal: 10, paddingVertical: 8 },
-  tableText: { color: colors.text, fontSize: 15, lineHeight: 21 },
+  tableText: { color: colors.text, fontSize: 14, lineHeight: 20 },
   tableStrong: { fontWeight: "700", textAlign: "right" },
   tableMessage: { minHeight: 150, alignItems: "center", justifyContent: "center" },
   emptyText: { color: colors.textMuted, fontSize: 15 },

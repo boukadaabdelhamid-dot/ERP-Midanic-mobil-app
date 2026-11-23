@@ -24,7 +24,7 @@ type CaisseTransferEvent = {
   actorUserId: number | null;
 };
 
-type TFn = (fr: string, ar: string) => string;
+type TFn = (fr: string, ar: string, en?: string) => string;
 
 function caisseTransferToast(
   msg: CaisseTransferEvent,
@@ -40,19 +40,19 @@ function caisseTransferToast(
   const iAmSender = me !== null && msg.senderUserId === me;
   switch (msg.status) {
     case "pending":
-      if (iAmRecipient) return { title: t(`Nouveau virement reçu ${id}`, `حوالة جديدة واردة ${id}`) };
+      if (iAmRecipient) return { title: t(`Nouveau virement reçu ${id}`, `حوالة جديدة واردة ${id}`, `New cash transfer received ${id}`) };
       return null;
     case "accepted":
-      if (iAmSender) return { title: t(`Virement ${id} accepté`, `تم قبول الحوالة ${id}`) };
+      if (iAmSender) return { title: t(`Virement ${id} accepté`, `تم قبول الحوالة ${id}`, `Cash transfer ${id} accepted`) };
       return null;
     case "rejected":
       if (iAmSender) {
-        return { title: t(`Virement ${id} refusé`, `تم رفض الحوالة ${id}`), variant: "destructive" };
+        return { title: t(`Virement ${id} refusé`, `تم رفض الحوالة ${id}`, `Cash transfer ${id} rejected`), variant: "destructive" };
       }
       return null;
     case "cancelled":
       if (iAmRecipient) {
-        return { title: t(`Virement ${id} annulé`, `تم إلغاء الحوالة ${id}`), variant: "destructive" };
+        return { title: t(`Virement ${id} annulé`, `تم إلغاء الحوالة ${id}`, `Cash transfer ${id} cancelled`), variant: "destructive" };
       }
       return null;
     default:
@@ -70,30 +70,30 @@ function transferToast(
   const id = `#${msg.transferId}`;
   switch (msg.status) {
     case "requested":
-      if (onDestination) return { title: t(`Nouvelle demande de transfert ${id}`, `طلب تحويل جديد ${id}`) };
+      if (onDestination) return { title: t(`Nouvelle demande de transfert ${id}`, `طلب تحويل جديد ${id}`, `New stock transfer request ${id}`) };
       return null;
     case "approved":
-      if (onSource) return { title: t(`Transfert ${id} approuvé`, `تمت الموافقة على التحويل ${id}`) };
+      if (onSource) return { title: t(`Transfert ${id} approuvé`, `تمت الموافقة على التحويل ${id}`, `Transfer ${id} approved`) };
       return null;
     case "rejected":
       if (onSource) {
-        return { title: t(`Transfert ${id} refusé`, `تم رفض التحويل ${id}`), variant: "destructive" };
+        return { title: t(`Transfert ${id} refusé`, `تم رفض التحويل ${id}`, `Transfer ${id} rejected`), variant: "destructive" };
       }
       return null;
     case "prepared":
-      if (onDestination) return { title: t(`Transfert ${id} préparé`, `تم تحضير التحويل ${id}`) };
+      if (onDestination) return { title: t(`Transfert ${id} préparé`, `تم تحضير التحويل ${id}`, `Transfer ${id} prepared`) };
       return null;
     case "in_transit":
       if (onDestination) {
-        return { title: t(`Transfert ${id} expédié — en cours`, `تم شحن التحويل ${id} — وارد`) };
+        return { title: t(`Transfert ${id} expédié — en cours`, `تم شحن التحويل ${id} — وارد`, `Transfer ${id} shipped — in transit`) };
       }
       return null;
     case "received":
-      if (onSource) return { title: t(`Transfert ${id} reçu par destination`, `تم استلام التحويل ${id} من الوجهة`) };
-      if (onDestination) return { title: t(`Transfert ${id} reçu`, `تم استلام التحويل ${id}`) };
+      if (onSource) return { title: t(`Transfert ${id} reçu par destination`, `تم استلام التحويل ${id} من الوجهة`, `Transfer ${id} received by destination`) };
+      if (onDestination) return { title: t(`Transfert ${id} reçu`, `تم استلام التحويل ${id}`, `Transfer ${id} received`) };
       return null;
     case "cancelled":
-      return { title: t(`Transfert ${id} annulé`, `تم إلغاء التحويل ${id}`), variant: "destructive" };
+      return { title: t(`Transfert ${id} annulé`, `تم إلغاء التحويل ${id}`, `Transfer ${id} cancelled`), variant: "destructive" };
     default:
       return null;
   }
@@ -105,7 +105,7 @@ export function useRealtimeWS(): void {
   const { user, isAdmin } = useMe();
   const { currentStoreId } = useStoreContext();
   const { toast } = useToast();
-  const { lang } = useLang();
+  const { lang, t } = useLang();
   const qc = useQueryClient();
   const wsRef = useRef<WebSocket | null>(null);
   const retryRef = useRef(0);
@@ -146,7 +146,7 @@ export function useRealtimeWS(): void {
           case "stock_transfer_changed": {
             invalidatePrefix("/api/erp/transfers");
             invalidatePrefix("/api/erp/products");
-            const tst = transferToast(msg as unknown as TransferEvent, storeIdRef.current, (fr, ar) => (lang === "ar" ? ar : fr));
+            const tst = transferToast(msg as unknown as TransferEvent, storeIdRef.current, t);
             if (tst) toastRef.current(tst);
             break;
           }
@@ -157,7 +157,10 @@ export function useRealtimeWS(): void {
             const sellerId = (msg as { sellerUserId?: number | null }).sellerUserId ?? null;
             const evtStoreId = (msg as { storeId?: number }).storeId;
             if (sellerId === null && evtStoreId === storeIdRef.current) {
-              toastRef.current({ title: "طلب جديد من المتجر", description: "Nouvelle commande en ligne reçue" });
+              toastRef.current({
+                title: t("Nouvelle commande reçue", "تم استلام طلب جديد", "New order received"),
+                description: t("Nouvelle commande en ligne reçue", "تم استلام طلب جديد عبر الإنترنت", "New online order received"),
+              });
             }
             break;
           }
@@ -188,7 +191,7 @@ export function useRealtimeWS(): void {
               msg as unknown as CaisseTransferEvent,
               userIdRef.current,
               isAdminRef.current,
-              (fr, ar) => (lang === "ar" ? ar : fr),
+              t,
             );
             if (ct) toastRef.current(ct);
             break;
@@ -216,5 +219,5 @@ export function useRealtimeWS(): void {
       try { wsRef.current?.close(); } catch { /* noop */ }
       wsRef.current = null;
     };
-  }, [token, user, qc]);
+  }, [token, user, qc, lang, t]);
 }

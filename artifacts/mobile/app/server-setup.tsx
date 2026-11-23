@@ -4,15 +4,17 @@ import {
   Text,
   Image,
   StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
   ActivityIndicator,
+  Pressable,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useServer } from "@/contexts/server-context";
 import { useLang } from "@/contexts/lang-context";
 import { colors } from "@/lib/colors";
 import { Button, FormField } from "@/components/ui";
+import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
+import { useLanguageSwitch } from "@/hooks/use-language-switch";
+import type { ErpLang } from "@/contexts/lang-context";
 
 /** Convert a company domain into its HTTPS origin, without an API path. */
 function normaliseCompanyDomain(raw: string): string | null {
@@ -59,7 +61,8 @@ async function pingServer(url: string): Promise<boolean> {
 export default function ServerSetup() {
   const router = useRouter();
   const { setServerUrl } = useServer();
-  const { t } = useLang();
+  const { lang, t } = useLang();
+  const { selectLanguage } = useLanguageSwitch();
 
   const [urlInput, setUrlInput] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -97,11 +100,33 @@ export default function ServerSetup() {
   };
 
   return (
-    <KeyboardAvoidingView
+    <KeyboardAwareScrollViewCompat
       style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+      bottomOffset={24}
     >
       <View style={styles.card}>
+        <View style={styles.languageRow}>
+          {([
+            ["fr", "Français"],
+            ["ar", "العربية"],
+            ["en", "English"],
+          ] as const).map(([language, label]) => (
+            <Pressable
+              key={language}
+              accessibilityRole="button"
+              accessibilityState={{ selected: lang === language }}
+              onPress={() => void selectLanguage(language as ErpLang)}
+              style={[styles.languageOption, lang === language && styles.languageOptionSelected]}
+            >
+              <Text style={[styles.languageText, lang === language && styles.languageTextSelected]}>
+                {label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
         <Image
           source={require("../assets/images/icon.png")}
           style={styles.logo}
@@ -147,7 +172,7 @@ export default function ServerSetup() {
           )}
         </View>
       </View>
-    </KeyboardAvoidingView>
+    </KeyboardAwareScrollViewCompat>
   );
 }
 
@@ -155,6 +180,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.primary,
+  },
+  content: {
+    flexGrow: 1,
     alignItems: "center",
     justifyContent: "center",
     padding: 20,
@@ -169,6 +197,22 @@ const styles = StyleSheet.create({
     borderBottomWidth: 3,
     borderBottomColor: colors.accent,
   },
+  languageRow: {
+    alignSelf: "stretch",
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 6,
+    marginBottom: 14,
+  },
+  languageOption: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: colors.background,
+  },
+  languageOptionSelected: { backgroundColor: colors.primary },
+  languageText: { color: colors.textMuted, fontSize: 12, fontWeight: "600" },
+  languageTextSelected: { color: colors.surface },
   logo: { width: 72, height: 72, borderRadius: 16, marginBottom: 12 },
   title: { fontSize: 26, fontWeight: "700", color: colors.primary },
   subtitle: { fontSize: 13, color: colors.textMuted, marginTop: 2 },

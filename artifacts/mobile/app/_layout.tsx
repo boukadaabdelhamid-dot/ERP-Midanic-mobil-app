@@ -5,6 +5,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Stack, useRootNavigationState, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { KeyboardProvider } from "react-native-keyboard-controller";
 import { configureApiClient } from "@/lib/api";
 import { queryClient } from "@/lib/query-client";
 import { LangProvider } from "@/contexts/lang-context";
@@ -38,34 +39,36 @@ export default function RootLayout() {
   return (
     <ErrorBoundary>
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <SafeAreaProvider>
-          <LangProvider>
-            <QueryClientProvider client={queryClient}>
-              <ServerProvider>
-                <AuthProvider>
-                  <StoreProvider>
-                    <PermissionsProvider>
-                      <ToastProvider>
-                        <ConfirmProvider>
-                          <ForceLogoutWiring />
-                          <RealtimeGate />
-                          <StatusBar style="light" />
-                          <Stack screenOptions={{ headerShown: false }}>
-                            <Stack.Screen name="index" />
-                            <Stack.Screen name="server-setup" />
-                            <Stack.Screen name="login" />
-                            <Stack.Screen name="select-store" />
-                            <Stack.Screen name="(app)" />
-                          </Stack>
-                        </ConfirmProvider>
-                      </ToastProvider>
-                    </PermissionsProvider>
-                  </StoreProvider>
-                </AuthProvider>
-              </ServerProvider>
-            </QueryClientProvider>
-          </LangProvider>
-        </SafeAreaProvider>
+        <KeyboardProvider>
+          <SafeAreaProvider>
+            <LangProvider>
+              <QueryClientProvider client={queryClient}>
+                <ServerProvider>
+                  <AuthProvider>
+                    <StoreProvider>
+                      <PermissionsProvider>
+                        <ToastProvider>
+                          <ConfirmProvider>
+                            <ForceLogoutWiring />
+                            <RealtimeGate />
+                            <StatusBar style="light" />
+                            <Stack screenOptions={{ headerShown: false }}>
+                              <Stack.Screen name="index" />
+                              <Stack.Screen name="server-setup" />
+                              <Stack.Screen name="login" />
+                              <Stack.Screen name="select-store" />
+                              <Stack.Screen name="(app)" />
+                            </Stack>
+                          </ConfirmProvider>
+                        </ToastProvider>
+                      </PermissionsProvider>
+                    </StoreProvider>
+                  </AuthProvider>
+                </ServerProvider>
+              </QueryClientProvider>
+            </LangProvider>
+          </SafeAreaProvider>
+        </KeyboardProvider>
       </GestureHandlerRootView>
     </ErrorBoundary>
   );

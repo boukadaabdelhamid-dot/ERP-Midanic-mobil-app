@@ -1,16 +1,16 @@
-import React, { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useGetSuppliers, getGetSuppliersQueryKey } from "@workspace/api-client-react";
 import { useProtectedRoute } from "@/hooks/use-protected-route";
 import { useLang } from "@/contexts/lang-context";
 import { ListScreen, SearchBar } from "@/components/ListScreen";
 import { EntityRow } from "@/components/EntityRow";
-import { Badge } from "@/components/ui";
+import { Badge, Button, ErrorState } from "@/components/ui";
 import { Fab } from "@/components/Fab";
 import { getContactBalance } from "@/lib/contact-balance";
 import { colors } from "@/lib/colors";
+import { useSupplierDirectory } from "@/hooks/use-smart-purchase";
 
 type SupplierListItem = {
   id: number;
@@ -29,41 +29,84 @@ export default function SuppliersList() {
   const { t, lang } = useLang();
   const router = useRouter();
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [locationFilter, setLocationFilter] = useState<"all" | "missing">("all");
   const currency = lang === "ar" ? "دج" : "DA";
 
-  const { data, isLoading, refetch, isRefetching } = useGetSuppliers({
-    query: { enabled: ready, queryKey: getGetSuppliersQueryKey() },
+  useEffect(() => {
+    const timeout = setTimeout(() => setDebouncedSearch(search.trim()), 250);
+    return () => clearTimeout(timeout);
+  }, [search]);
+
+  const suppliersQuery = useSupplierDirectory({
+    enabled: ready,
+    search: debouncedSearch,
+    missingLocation: locationFilter === "missing",
   });
-  const suppliers = ((data as unknown as { data?: SupplierListItem[] })?.data ?? []);
-  const missingLocationCount = suppliers.filter((supplier) => !hasGps(supplier)).length;
-  const filteredSuppliers = useMemo(() => {
-    const normalizedSearch = search.trim().toLocaleLowerCase(lang === "ar" ? "ar-DZ" : "fr-FR");
-    return suppliers.filter((supplier) => {
-      if (locationFilter === "missing" && hasGps(supplier)) return false;
-      if (!normalizedSearch) return true;
-      return [
-        supplier.name,
-        supplier.phone,
-        supplier.email,
-        supplier.address,
-        supplier.wilaya,
-        supplier.commune,
-      ].some((value) => value?.toLocaleLowerCase(lang === "ar" ? "ar-DZ" : "fr-FR").includes(normalizedSearch));
-    });
-  }, [lang, locationFilter, search, suppliers]);
+  const pages = suppliersQuery.data?.pages;
+  const suppliers = useMemo(
+    () => pages?.flatMap((page) => page.data) ?? [],
+    [pages],
+  );
+  const total = pages?.[0]?.total ?? 0;
+  const missingLocationCount = pages?.[0]?.missingLocationTotal ?? 0;
 
   if (!ready) return null;
   const canCreate = isAdmin || can("suppliers", "create");
   const canEdit = isAdmin || can("suppliers", "edit");
+  if (suppliersQuery.isError && !suppliersQuery.data) {
+    return (
+      <View style={styles.errorContainer}>
+        <ErrorState
+          title={t("Impossible de charger les fournisseurs", "تعذر تحميل الموردين")}
+          subtitle={t("Vérifiez la connexion puis réessayez.", "تحقق من الاتصال ثم أعد المحاولة.")}
+        />
+        <Button
+          label={t("Réessayer", "إعادة المحاولة")}
+          onPress={() => { void suppliersQuery.refetch(); }}
+          loading={suppliersQuery.isRefetching}
+          testID="button-retry-suppliers"
+        />
+      </View>
+    );
+  }
+
+  const footer = suppliersQuery.isFetchingNextPage ? (
+    <View style={styles.paginationFooter}>
+      <ActivityIndicator size="small" color={colors.primary} />
+      <Text style={styles.footerText}>{t("Chargement...", "جارٍ تحميل المزيد...")}</Text>
+    </View>
+  ) : suppliersQuery.hasNextPage ? (
+    <View style={styles.paginationFooter}>
+      <Text style={styles.footerText}>
+        {t(`${suppliers.length} sur ${total} fournisseurs`, `${suppliers.length} من ${total} مورد`, `${suppliers.length} of ${total} suppliers`)}
+      </Text>
+      <Button
+        label={t("Afficher plus", "عرض المزيد")}
+        variant="secondary"
+        onPress={() => { void suppliersQuery.fetchNextPage(); }}
+        testID="button-load-more-suppliers"
+      />
+    </View>
+  ) : total > 0 ? (
+    <Text style={styles.footerText}>
+      {t(`Tous les fournisseurs affichés (${total})`, `تم عرض جميع الموردين (${total})`, `All ${total} suppliers are displayed`)}
+    </Text>
+  ) : undefined;
 
   return (
     <View style={{ flex: 1 }}>
       <ListScreen
-        data={filteredSuppliers}
-        isLoading={isLoading}
-        onRefresh={refetch}
-        refreshing={isRefetching}
+        data={suppliers}
+        isLoading={suppliersQuery.isLoading}
+        onRefresh={() => { void suppliersQuery.refetch(); }}
+        refreshing={suppliersQuery.isRefetching && !suppliersQuery.isFetchingNextPage}
+        onEndReached={() => {
+          if (suppliersQuery.hasNextPage && !suppliersQuery.isFetchingNextPage) {
+            void suppliersQuery.fetchNextPage();
+          }
+        }}
+        footer={footer}
         keyExtractor={(supplier) => String(supplier.id)}
         emptyTitle={search.trim()
           ? t("Aucun résultat", "لا توجد نتائج")
@@ -76,7 +119,7 @@ export default function SuppliersList() {
             <SearchBar value={search} onChangeText={setSearch} placeholder={t("Rechercher...", "بحث...")} />
             <View style={styles.filters}>
               <LocationFilterButton
-                label={`${t("Tous", "الكل")} (${suppliers.length})`}
+                label={locationFilter === "all" ? `${t("Tous", "الكل")} (${total})` : t("Tous", "الكل")}
                 selected={locationFilter === "all"}
                 onPress={() => setLocationFilter("all")}
                 testID="filter-suppliers-all"
@@ -162,8 +205,11 @@ function LocationFilterButton({
 }
 
 const styles = StyleSheet.create({
+  errorContainer: { flex: 1, justifyContent: "center", padding: 24, gap: 12 },
   listHeader: { paddingBottom: 8 },
   filters: { flexDirection: "row", gap: 8, marginHorizontal: 16, marginBottom: 8 },
+  paginationFooter: { paddingHorizontal: 18, paddingVertical: 16, gap: 10, alignItems: "center" },
+  footerText: { color: colors.textMuted, fontSize: 13, textAlign: "center", paddingVertical: 10 },
   filterButton: {
     minHeight: 38,
     justifyContent: "center",

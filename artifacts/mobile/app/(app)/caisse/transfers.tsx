@@ -12,7 +12,7 @@ import {
   type GetErpCaisseTransfersBox,
 } from "@workspace/api-client-react";
 import { useProtectedRoute } from "@/hooks/use-protected-route";
-import { useLang } from "@/contexts/lang-context";
+import { localeForLanguage, useLang } from "@/contexts/lang-context";
 import { useMe } from "@/hooks/use-me";
 import { useApiFeedback } from "@/hooks/use-api-feedback";
 import { useConfirm } from "@/contexts/confirm-context";
@@ -147,7 +147,7 @@ export default function CaisseTransfers() {
                 <Badge label={t(fr, ar)} tone={STATUS_TONE[tr.status] ?? "muted"} />
               </View>
               <Text style={styles.mutedSmall}>{senderLabel} → {recipientLabel}</Text>
-              <Text style={styles.mutedSmall}>{new Date(tr.createdAt).toLocaleString("fr-FR")}</Text>
+              <Text style={styles.mutedSmall}>{new Date(tr.createdAt).toLocaleString(localeForLanguage(lang))}</Text>
               {tr.notes ? <Text style={styles.mutedSmall}>{tr.notes}</Text> : null}
               {isPending ? (
                 <View style={styles.actionsRow}>

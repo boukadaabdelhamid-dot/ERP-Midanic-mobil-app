@@ -14,7 +14,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCreateErpTransfer, getGetErpTransfersQueryKey } from "@workspace/api-client-react";
 import { Feather } from "@expo/vector-icons";
 import { useProtectedRoute } from "@/hooks/use-protected-route";
-import { useLang } from "@/contexts/lang-context";
+import { localeForLanguage, useLang, type ErpLang } from "@/contexts/lang-context";
 import { useApiFeedback } from "@/hooks/use-api-feedback";
 import { erpFetch } from "@/hooks/use-smart-purchase";
 import {
@@ -385,7 +385,7 @@ function SlowMoverCard({
   row, lang, t, currency, canEditPrice, onEditPrice, onSnooze, snoozed,
 }: {
   row: SlowMoverRow;
-  lang: "ar" | "fr";
+  lang: ErpLang;
   t: (fr: string, ar: string) => string;
   currency: string;
   canEditPrice: boolean;
@@ -424,7 +424,7 @@ function SlowMoverCard({
   );
 }
 
-function ExpiryCard({ row, lang, t }: { row: ExpiringProductRow; lang: "ar" | "fr"; t: (fr: string, ar: string) => string }) {
+function ExpiryCard({ row, lang, t }: { row: ExpiringProductRow; lang: ErpLang; t: (fr: string, ar: string) => string }) {
   const urgent = row.days_left <= 7;
   return (
     <Card style={[styles.alertCard, urgent && styles.urgentCard]}>
@@ -439,7 +439,7 @@ function ExpiryCard({ row, lang, t }: { row: ExpiringProductRow; lang: "ar" | "f
       </View>
       <View style={styles.statsRow}>
         <Text style={styles.stock}>{t("Quantité", "الكمية")}: {row.quantity}</Text>
-        <Text style={styles.localStock}>{new Date(row.expiry_date).toLocaleDateString(lang === "ar" ? "ar-DZ" : "fr-FR")}</Text>
+        <Text style={styles.localStock}>{new Date(row.expiry_date).toLocaleDateString(localeForLanguage(lang))}</Text>
       </View>
     </Card>
   );

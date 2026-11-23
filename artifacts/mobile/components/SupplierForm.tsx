@@ -3,7 +3,7 @@ import { AppState, Linking, Platform, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import type { Supplier } from "@workspace/api-client-react";
-import { useLang } from "@/contexts/lang-context";
+import { localeForLanguage, useLang } from "@/contexts/lang-context";
 import { Card, Button, FormField, SectionTitle } from "@/components/ui";
 import { colors } from "@/lib/colors";
 
@@ -273,7 +273,7 @@ export function SupplierForm({
             {values.locationAccuracyMeters != null
               ? `± ${Math.round(values.locationAccuracyMeters)} m · `
               : ""}
-            {new Date(values.locationCapturedAt).toLocaleString(lang === "ar" ? "ar-DZ" : "fr-FR")}
+            {new Date(values.locationCapturedAt).toLocaleString(localeForLanguage(lang))}
           </Text>
         ) : null}
         <FormField

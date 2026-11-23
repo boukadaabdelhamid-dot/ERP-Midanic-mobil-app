@@ -96,7 +96,7 @@ export function EmployeeForm({
         <FormField label="Email" value={values.email} onChangeText={(v) => set("email", v)} keyboardType="email-address" autoCapitalize="none" />
         <FormField label={t("Téléphone", "الهاتف")} value={values.phone} onChangeText={(v) => set("phone", v)} keyboardType="phone-pad" />
         <FormField
-          label={t(`Salaire (${currency})`, `الراتب (${currency})`)}
+          label={t(`Salaire (${currency})`, `الراتب (${currency})`, `Salary (${currency})`)}
           value={values.salary}
           onChangeText={(v) => set("salary", v)}
           keyboardType="decimal-pad"

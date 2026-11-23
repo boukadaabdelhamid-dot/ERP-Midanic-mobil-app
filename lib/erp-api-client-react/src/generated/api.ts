@@ -81,6 +81,7 @@ import type {
   GeneratePayrollRequest,
   GeneratePayrollResponse,
   GetAdminOrdersParams,
+  GetAdminRetoursParams,
   GetAttendanceParams,
   GetCustomerOperationsParams,
   GetCustomerProfitReportParams,
@@ -88,6 +89,7 @@ import type {
   GetErpCaisseSessionsParams,
   GetErpCaisseTransferRecipientsParams,
   GetErpCaisseTransfersParams,
+  GetErpCustomerParams,
   GetErpCustomersParams,
   GetErpTransfersParams,
   GetLowStockParams,
@@ -166,6 +168,14 @@ import type {
   ValidateCouponRequest,
 } from "./api.schemas";
 
+import {
+  getAdminRetoursQueryKey,
+  getAdminRetoursUrl,
+} from "../admin-retours-query";
+import {
+  getCustomerDetailQueryKey,
+  getCustomerDetailUrl,
+} from "../customer-detail-query";
 import { customFetch } from "../custom-fetch";
 import type { ErrorType, BodyType } from "../custom-fetch";
 
@@ -3074,41 +3084,45 @@ export const useCreateBonRetour = <
 /**
  * @summary List all Bons Retour (admin)
  */
-export const getGetAdminRetoursUrl = () => {
-  return `/api/admin/retours`;
+export const getGetAdminRetoursUrl = (params?: GetAdminRetoursParams) => {
+  return getAdminRetoursUrl(params);
 };
 
 export const getAdminRetours = async (
+  params?: GetAdminRetoursParams,
   options?: RequestInit,
 ): Promise<BonRetour[]> => {
-  return customFetch<BonRetour[]>(getGetAdminRetoursUrl(), {
+  return customFetch<BonRetour[]>(getGetAdminRetoursUrl(params), {
     ...options,
     method: "GET",
   });
 };
 
-export const getGetAdminRetoursQueryKey = () => {
-  return [`/api/admin/retours`] as const;
+export const getGetAdminRetoursQueryKey = (params?: GetAdminRetoursParams) => {
+  return getAdminRetoursQueryKey(params);
 };
 
 export const getGetAdminRetoursQueryOptions = <
   TData = Awaited<ReturnType<typeof getAdminRetours>>,
   TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getAdminRetours>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
+>(
+  params?: GetAdminRetoursParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAdminRetours>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getGetAdminRetoursQueryKey();
+  const queryKey = queryOptions?.queryKey ?? getGetAdminRetoursQueryKey(params);
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminRetours>>> = ({
     signal,
-  }) => getAdminRetours({ signal, ...requestOptions });
+  }) => getAdminRetours(params, { signal, ...requestOptions });
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof getAdminRetours>>,
@@ -3129,15 +3143,18 @@ export type GetAdminRetoursQueryError = ErrorType<unknown>;
 export function useGetAdminRetours<
   TData = Awaited<ReturnType<typeof getAdminRetours>>,
   TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getAdminRetours>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetAdminRetoursQueryOptions(options);
+>(
+  params?: GetAdminRetoursParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getAdminRetours>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetAdminRetoursQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
@@ -9913,22 +9930,29 @@ export const useCreateErpCustomer = <
 /**
  * @summary Get customer detail
  */
-export const getGetErpCustomerUrl = (id: number) => {
-  return `/api/erp/customers/${id}`;
+export const getGetErpCustomerUrl = (
+  id: number,
+  params?: GetErpCustomerParams,
+) => {
+  return getCustomerDetailUrl(id, params);
 };
 
 export const getErpCustomer = async (
   id: number,
+  params?: GetErpCustomerParams,
   options?: RequestInit,
 ): Promise<CustomerDetail> => {
-  return customFetch<CustomerDetail>(getGetErpCustomerUrl(id), {
+  return customFetch<CustomerDetail>(getGetErpCustomerUrl(id, params), {
     ...options,
     method: "GET",
   });
 };
 
-export const getGetErpCustomerQueryKey = (id: number) => {
-  return [`/api/erp/customers/${id}`] as const;
+export const getGetErpCustomerQueryKey = (
+  id: number,
+  params?: GetErpCustomerParams,
+) => {
+  return getCustomerDetailQueryKey(id, params);
 };
 
 export const getGetErpCustomerQueryOptions = <
@@ -9943,15 +9967,16 @@ export const getGetErpCustomerQueryOptions = <
       TData
     >;
     request?: SecondParameter<typeof customFetch>;
+    params?: GetErpCustomerParams;
   },
 ) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {};
+  const { query: queryOptions, request: requestOptions, params } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getGetErpCustomerQueryKey(id);
+  const queryKey = queryOptions?.queryKey ?? getGetErpCustomerQueryKey(id, params);
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof getErpCustomer>>> = ({
     signal,
-  }) => getErpCustomer(id, { signal, ...requestOptions });
+  }) => getErpCustomer(id, params, { signal, ...requestOptions });
 
   return {
     queryKey,
@@ -9986,6 +10011,7 @@ export function useGetErpCustomer<
       TData
     >;
     request?: SecondParameter<typeof customFetch>;
+    params?: GetErpCustomerParams;
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetErpCustomerQueryOptions(id, options);

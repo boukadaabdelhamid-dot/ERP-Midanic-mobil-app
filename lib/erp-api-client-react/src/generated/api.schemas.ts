@@ -466,6 +466,11 @@ export interface BonRetour {
   originalOrder?: Order | null;
 }
 
+export interface GetAdminRetoursParams {
+  clientUserId?: number;
+  limit?: number;
+}
+
 export type BonRetourDetailItemsItemProduct = {
   id?: number;
   nameAr?: string;
@@ -2240,6 +2245,13 @@ export type GetErpCustomersParams = {
   limit?: number;
 };
 
+export type GetErpCustomerParams = {
+  /** Limit the recent orders returned by the customer detail request. */
+  ordersLimit?: number;
+  /** Avoid loading notes when the caller does not display them. */
+  includeNotes?: boolean;
+};
+
 export type SetErpStaffStoresBody = {
   storeIds: number[];
 };
@@ -2261,6 +2273,8 @@ export type GetCustomerOperationsParams = {
   type?: GetCustomerOperationsType;
   from?: string;
   to?: string;
+  limit?: number;
+  order?: "asc" | "desc";
 };
 
 export type GetCustomerOperationsType =

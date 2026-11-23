@@ -65,13 +65,13 @@ export function sortSuppliersByDistance<T extends SupplierCoordinates>(
   });
 }
 
-export function formatSupplierDistance(distanceKm: number, lang: string): string {
+export function formatSupplierDistance(distanceKm: number, lang: "fr" | "ar" | "en"): string {
   if (distanceKm < 1) {
     const meters = Math.max(10, Math.round(distanceKm * 100) * 10);
     return `${meters} ${lang === "ar" ? "م" : "m"}`;
   }
 
-  const distance = new Intl.NumberFormat(lang === "ar" ? "ar-DZ" : "fr-DZ", {
+  const distance = new Intl.NumberFormat(lang === "ar" ? "ar-DZ" : lang === "en" ? "en-GB" : "fr-DZ", {
     maximumFractionDigits: 1,
     minimumFractionDigits: 0,
   }).format(distanceKm);

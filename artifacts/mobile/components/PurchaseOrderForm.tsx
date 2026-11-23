@@ -2,8 +2,6 @@ import React, { useMemo, useState } from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import {
-  useGetSuppliers,
-  getGetSuppliersQueryKey,
   useGetProducts,
   getGetProductsQueryKey,
   type Supplier,
@@ -13,11 +11,13 @@ import { useLang } from "@/contexts/lang-context";
 import { Card, Button, FormField, SectionTitle, Divider } from "@/components/ui";
 import { PickerField } from "@/components/Picker";
 import { colors } from "@/lib/colors";
+import { useSuppliersAll } from "@/hooks/use-smart-purchase";
 
 export type PurchaseOrderLine = { product: Product; quantity: string; unitCost: string };
+type SupplierSelection = Pick<Supplier, "id" | "name" | "phone">;
 
 export type PurchaseOrderFormValues = {
-  supplier: Supplier | null;
+  supplier: SupplierSelection | null;
   notes: string;
   paymentMethod: "comptant" | "a_terme";
   lines: PurchaseOrderLine[];
@@ -49,10 +49,12 @@ export function PurchaseOrderForm({
   const currency = lang === "ar" ? "دج" : "DA";
   const [error, setError] = useState("");
 
-  const { data: suppliersData } = useGetSuppliers({
-    query: { queryKey: getGetSuppliersQueryKey() },
-  });
-  const suppliers = ((suppliersData as unknown as { data?: Supplier[] })?.data ?? []) as Supplier[];
+  const {
+    data: suppliers = [],
+    isLoading: suppliersLoading,
+    isError: suppliersFailed,
+    refetch: reloadSuppliers,
+  } = useSuppliersAll(true);
 
   const productsParams = { limit: 500 };
   const { data: productsData } = useGetProducts(productsParams, {
@@ -106,7 +108,7 @@ export function PurchaseOrderForm({
     <View>
       <Card>
         <SectionTitle>{t("Fournisseur", "المورد")}</SectionTitle>
-        <PickerField<Supplier>
+        <PickerField<SupplierSelection>
           label={t("Fournisseur", "المورد")}
           value={values.supplier}
           items={suppliers}
@@ -115,7 +117,19 @@ export function PurchaseOrderForm({
           subtitleExtractor={(s) => s.phone ?? undefined}
           onChange={(s) => set("supplier", s)}
           placeholder={t("Sélectionner...", "اختر...")}
+          disabled={suppliersLoading || suppliersFailed}
         />
+        {suppliersLoading ? (
+          <Text style={styles.muted}>{t("Chargement des fournisseurs...", "جارٍ تحميل الموردين...")}</Text>
+        ) : null}
+        {suppliersFailed ? (
+          <Button
+            label={t("Réessayer le chargement des fournisseurs", "إعادة تحميل الموردين")}
+            variant="secondary"
+            onPress={() => { void reloadSuppliers(); }}
+            testID="button-retry-purchase-order-suppliers"
+          />
+        ) : null}
         <FormField label={t("Notes", "ملاحظات")} value={values.notes} onChangeText={(v) => set("notes", v)} multiline />
       </Card>
 
@@ -171,7 +185,7 @@ export function PurchaseOrderForm({
                   keyboardType="numeric"
                 />
                 <FormField
-                  label={t(`Coût unitaire (${currency})`, `تكلفة الوحدة (${currency})`)}
+                  label={t(`Coût unitaire (${currency})`, `تكلفة الوحدة (${currency})`, `Unit cost (${currency})`)}
                   value={line.unitCost}
                   onChangeText={(v) => updateLine(line.product.id, { unitCost: v })}
                   keyboardType="decimal-pad"

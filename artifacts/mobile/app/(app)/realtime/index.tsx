@@ -4,7 +4,7 @@ import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useGetAdminOrders, getGetAdminOrdersQueryKey, type Order } from "@workspace/api-client-react";
 import { useProtectedRoute } from "@/hooks/use-protected-route";
-import { useLang } from "@/contexts/lang-context";
+import { localeForLanguage, useLang, type ErpLang } from "@/contexts/lang-context";
 import { Screen } from "@/components/Screen";
 import { Badge, Card, EmptyState, ErrorState, LoadingView } from "@/components/ui";
 import { colors } from "@/lib/colors";
@@ -17,9 +17,9 @@ const STATUS_TONE: Record<string, "success" | "warning" | "danger" | "muted" | "
   cancelled: "danger",
 };
 
-function formatDa(value: number | string, lang: "fr" | "ar") {
+function formatDa(value: number | string, lang: ErpLang) {
   const amount = Number(value);
-  const formatted = amount.toLocaleString(lang === "ar" ? "ar-DZ" : "fr-FR", {
+  const formatted = amount.toLocaleString(localeForLanguage(lang), {
     maximumFractionDigits: 2,
   });
   return `${formatted} ${lang === "ar" ? "دج" : "DA"}`;
@@ -36,26 +36,32 @@ function isToday(dateValue: string | undefined) {
   );
 }
 
-function relativeTime(dateValue: string | undefined, lang: "fr" | "ar") {
+function relativeTime(dateValue: string | undefined, lang: ErpLang) {
   if (!dateValue) return "—";
   const elapsedMinutes = Math.max(0, Math.floor((Date.now() - new Date(dateValue).getTime()) / 60000));
-  if (elapsedMinutes < 1) return lang === "ar" ? "الآن" : "à l'instant";
+  if (elapsedMinutes < 1) return lang === "ar" ? "الآن" : lang === "en" ? "just now" : "à l'instant";
   if (elapsedMinutes < 60) {
-    return lang === "ar" ? `منذ ${elapsedMinutes} د` : `il y a ${elapsedMinutes} min`;
+    return lang === "ar"
+      ? `منذ ${elapsedMinutes} د`
+      : lang === "en"
+        ? `${elapsedMinutes} min ago`
+        : `il y a ${elapsedMinutes} min`;
   }
   const hours = Math.floor(elapsedMinutes / 60);
-  if (hours < 24) return lang === "ar" ? `منذ ${hours} س` : `il y a ${hours} h`;
+  if (hours < 24) {
+    return lang === "ar" ? `منذ ${hours} س` : lang === "en" ? `${hours} hr ago` : `il y a ${hours} h`;
+  }
   const days = Math.floor(hours / 24);
-  return lang === "ar" ? `منذ ${days} يوم` : `il y a ${days} j`;
+  return lang === "ar" ? `منذ ${days} يوم` : lang === "en" ? `${days} day${days === 1 ? "" : "s"} ago` : `il y a ${days} j`;
 }
 
-function statusLabel(status: string, lang: "fr" | "ar") {
-  const labels: Record<string, { fr: string; ar: string }> = {
-    pending: { fr: "En attente", ar: "في الانتظار" },
-    processing: { fr: "En cours", ar: "قيد المعالجة" },
-    shipped: { fr: "Expédiée", ar: "تم الشحن" },
-    delivered: { fr: "Livrée", ar: "تم التسليم" },
-    cancelled: { fr: "Annulée", ar: "ملغاة" },
+function statusLabel(status: string, lang: ErpLang) {
+  const labels: Record<string, { fr: string; ar: string; en: string }> = {
+    pending: { fr: "En attente", ar: "في الانتظار", en: "Pending" },
+    processing: { fr: "En cours", ar: "قيد المعالجة", en: "In progress" },
+    shipped: { fr: "Expédiée", ar: "تم الشحن", en: "Shipped" },
+    delivered: { fr: "Livrée", ar: "تم التسليم", en: "Delivered" },
+    cancelled: { fr: "Annulée", ar: "ملغاة", en: "Cancelled" },
   };
   return labels[status]?.[lang] ?? status;
 }
@@ -88,7 +94,7 @@ function MetricCard({
   );
 }
 
-function OrderRow({ order, lang, onPress }: { order: Order; lang: "fr" | "ar"; onPress: () => void }) {
+function OrderRow({ order, lang, onPress }: { order: Order; lang: ErpLang; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.orderRow, pressed && styles.pressed]}>
       <View style={styles.cartCircle}>
@@ -160,7 +166,7 @@ export default function RealTime() {
           <Text style={styles.subtitle}>
             {t("Mise à jour automatique toutes les 10 secondes", "تحديث تلقائي كل 10 ثوانٍ")}
             {dataUpdatedAt
-              ? ` · ${t("Dernière mise à jour", "آخر تحديث")} : ${new Date(dataUpdatedAt).toLocaleTimeString(lang === "ar" ? "ar-DZ" : "fr-FR")}`
+              ? ` · ${t("Dernière mise à jour", "آخر تحديث")} : ${new Date(dataUpdatedAt).toLocaleTimeString(localeForLanguage(lang))}`
               : ""}
           </Text>
         </View>

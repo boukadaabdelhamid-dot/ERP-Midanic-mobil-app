@@ -3,10 +3,10 @@ import { View, Text, Pressable, StyleSheet, Platform } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { colors } from "@/lib/colors";
-import { useLang } from "@/contexts/lang-context";
+import { localeForLanguage, useLang, type ErpLang } from "@/contexts/lang-context";
 
-function formatDate(date: Date, lang: "fr" | "ar"): string {
-  return date.toLocaleDateString(lang === "ar" ? "ar" : "fr-FR", {
+function formatDate(date: Date, lang: ErpLang): string {
+  return date.toLocaleDateString(localeForLanguage(lang), {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -152,7 +152,7 @@ export function DateRangeField({
     <View style={[styles.rangeRow, isRTL && styles.rangeRowRTL]}>
       <View style={{ flex: 1 }}>
         <DateField
-          label={t(`${label} — début`, `${label} — من`)}
+          label={t(`${label} — début`, `${label} — من`, `${label} — start`)}
           value={startDate}
           onChange={onChangeStart}
           maximumDate={endDate ?? undefined}
@@ -160,7 +160,7 @@ export function DateRangeField({
       </View>
       <View style={{ flex: 1 }}>
         <DateField
-          label={t(`${label} — fin`, `${label} — إلى`)}
+          label={t(`${label} — fin`, `${label} — إلى`, `${label} — end`)}
           value={endDate}
           onChange={onChangeEnd}
           minimumDate={startDate ?? undefined}

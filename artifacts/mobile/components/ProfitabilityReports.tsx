@@ -31,7 +31,7 @@ import {
   type ProductProfitRow,
   type SupplierReportRow,
 } from "@workspace/api-client-react";
-import { useLang } from "@/contexts/lang-context";
+import { localeForLanguage, localizedText, useLang, type ErpLang } from "@/contexts/lang-context";
 import { useStoreContext } from "@/contexts/store-context";
 import { useApiFeedback } from "@/hooks/use-api-feedback";
 import { Screen } from "@/components/Screen";
@@ -72,10 +72,10 @@ function formatPercent(value: number | null | undefined) {
   return `${Number(value ?? 0).toFixed(1)}%`;
 }
 
-function formatDate(value: string, lang: "fr" | "ar") {
+function formatDate(value: string, lang: ErpLang) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString(lang === "ar" ? "ar-DZ" : "fr-FR");
+  return date.toLocaleDateString(localeForLanguage(lang));
 }
 
 function Metric({ label, value, color }: { label: string; value: string; color?: string }) {
@@ -167,7 +167,7 @@ function MonthlyView({
 }: {
   rows: MonthlyReportRow[];
   currency: string;
-  lang: "fr" | "ar";
+  lang: ErpLang;
   emptyLabel: string;
   onOpenExpenses: (month: string) => void;
 }) {
@@ -178,7 +178,7 @@ function MonthlyView({
   return (
     <>
       <Card>
-        <SectionTitle>{lang === "ar" ? "تطور رقم الأعمال والأرباح" : "Évolution mensuelle — CA vs bénéfice"}</SectionTitle>
+        <SectionTitle>{localizedText(lang, "Évolution mensuelle — CA vs bénéfice", "تطور رقم الأعمال والأرباح")}</SectionTitle>
         {rows.length === 0 ? (
           <Text style={styles.muted}>{emptyLabel}</Text>
         ) : (
@@ -208,27 +208,27 @@ function MonthlyView({
               ))}
             </View>
             <View style={styles.legend}>
-              <Legend color={colors.primary} label={lang === "ar" ? "رقم الأعمال" : "CA"} />
-              <Legend color={colors.info} label={lang === "ar" ? "الربح الإجمالي" : "Bénéf. brut"} />
-              <Legend color={colors.danger} label={lang === "ar" ? "المصاريف" : "Charges"} />
-              <Legend color={colors.success} label={lang === "ar" ? "الربح الصافي" : "Bénéf. net"} />
+              <Legend color={colors.primary} label={localizedText(lang, "CA", "رقم الأعمال")} />
+              <Legend color={colors.info} label={localizedText(lang, "Bénéf. brut", "الربح الإجمالي")} />
+              <Legend color={colors.danger} label={localizedText(lang, "Charges", "المصاريف")} />
+              <Legend color={colors.success} label={localizedText(lang, "Bénéf. net", "الربح الصافي")} />
             </View>
           </>
         )}
       </Card>
       <Card>
-        <SectionTitle>{lang === "ar" ? "التفصيل الشهري" : "Détail mensuel"}</SectionTitle>
+        <SectionTitle>{localizedText(lang, "Détail mensuel", "التفصيل الشهري")}</SectionTitle>
         {rows.map((row) => (
           <View key={row.month} style={styles.detailCard}>
             <Text style={styles.detailTitle}>{row.month}</Text>
             <View style={styles.metricsGrid}>
-              <Metric label={lang === "ar" ? "رقم الأعمال" : "Chiffre d'affaires"} value={formatAmount(row.totalRevenue, currency)} />
+              <Metric label={localizedText(lang, "Chiffre d'affaires", "رقم الأعمال")} value={formatAmount(row.totalRevenue, currency)} />
               <Metric label="COGS" value={formatAmount(row.totalCogs, currency)} />
-              <Metric label={lang === "ar" ? "المرتجعات" : "Retours"} value={formatAmount(row.totalRetours, currency)} color={colors.warning} />
-              <Metric label={lang === "ar" ? "المصاريف" : "Charges"} value={formatAmount(row.totalExpenses, currency)} color={colors.danger} />
-              <Metric label={lang === "ar" ? "الربح الإجمالي" : "Bénéfice brut"} value={formatAmount(row.grossProfit, currency)} color={colors.success} />
-              <Metric label={lang === "ar" ? "الهامش" : "Marge"} value={formatPercent(row.grossMargin)} color={colors.success} />
-              <Metric label={lang === "ar" ? "الربح الصافي" : "Bénéfice net"} value={formatAmount(row.netProfit, currency)} color={colors.primary} />
+              <Metric label={localizedText(lang, "Retours", "المرتجعات")} value={formatAmount(row.totalRetours, currency)} color={colors.warning} />
+              <Metric label={localizedText(lang, "Charges", "المصاريف")} value={formatAmount(row.totalExpenses, currency)} color={colors.danger} />
+              <Metric label={localizedText(lang, "Bénéfice brut", "الربح الإجمالي")} value={formatAmount(row.grossProfit, currency)} color={colors.success} />
+              <Metric label={localizedText(lang, "Marge", "الهامش")} value={formatPercent(row.grossMargin)} color={colors.success} />
+              <Metric label={localizedText(lang, "Bénéfice net", "الربح الصافي")} value={formatAmount(row.netProfit, currency)} color={colors.primary} />
             </View>
             <Pressable
               onPress={() => onOpenExpenses(row.month)}
@@ -237,7 +237,7 @@ function MonthlyView({
               testID={`button-expense-details-${row.month}`}
             >
               <Feather name="file-text" size={14} color={colors.primary} />
-              <Text style={styles.expenseLinkText}>{lang === "ar" ? "عرض تفاصيل المصاريف" : "Voir le détail des charges"}</Text>
+              <Text style={styles.expenseLinkText}>{localizedText(lang, "Voir le détail des charges", "عرض تفاصيل المصاريف")}</Text>
             </Pressable>
           </View>
         ))}
@@ -246,29 +246,29 @@ function MonthlyView({
   );
 }
 
-function ProductView({ rows, currency, lang, emptyLabel }: { rows: ProductProfitRow[]; currency: string; lang: "fr" | "ar"; emptyLabel: string }) {
+function ProductView({ rows, currency, lang, emptyLabel }: { rows: ProductProfitRow[]; currency: string; lang: ErpLang; emptyLabel: string }) {
   return (
     <>
       <SimpleBarList
-        title={lang === "ar" ? "أفضل 10 — الربح الإجمالي" : "Top 10 — Bénéfice brut"}
+        title={localizedText(lang, "Top 10 — Bénéfice brut", "أفضل 10 — الربح الإجمالي")}
         rows={rows.slice(0, 10).map((row) => ({ label: lang === "ar" ? row.nameAr || row.nameEn : row.nameEn || row.nameAr, value: row.grossProfit }))}
         currency={currency}
         emptyLabel={emptyLabel}
       />
       <Card>
-        <SectionTitle>{lang === "ar" ? "تفصيل المنتجات" : "Détail par produit"}</SectionTitle>
+        <SectionTitle>{localizedText(lang, "Détail par produit", "تفصيل المنتجات")}</SectionTitle>
         {rows.length === 0 ? <Text style={styles.muted}>{emptyLabel}</Text> : null}
         {rows.slice(0, 50).map((row) => (
           <View key={row.id} style={styles.detailCard}>
             <Text style={styles.detailTitle}>{lang === "ar" ? row.nameAr || row.nameEn : row.nameEn || row.nameAr}</Text>
             {row.reference ? <Text style={styles.detailSubtitle}>{row.reference}</Text> : null}
             <View style={styles.metricsGrid}>
-              <Metric label={lang === "ar" ? "المباع" : "Vendu"} value={String(row.totalSold)} />
-              <Metric label={lang === "ar" ? "رقم الأعمال" : "CA"} value={formatAmount(row.totalRevenue, currency)} />
+              <Metric label={localizedText(lang, "Vendu", "المباع")} value={String(row.totalSold)} />
+              <Metric label={localizedText(lang, "CA", "رقم الأعمال")} value={formatAmount(row.totalRevenue, currency)} />
               <Metric label="COGS" value={formatAmount(row.totalCogs, currency)} />
-              <Metric label={lang === "ar" ? "الربح الإجمالي" : "Bénéfice brut"} value={formatAmount(row.grossProfit, currency)} color={colors.success} />
-              <Metric label={lang === "ar" ? "الهامش" : "Marge"} value={formatPercent(row.grossMargin)} color={colors.success} />
-              <Metric label={lang === "ar" ? "المخزون" : "Stock"} value={String(row.stock)} />
+              <Metric label={localizedText(lang, "Bénéfice brut", "الربح الإجمالي")} value={formatAmount(row.grossProfit, currency)} color={colors.success} />
+              <Metric label={localizedText(lang, "Marge", "الهامش")} value={formatPercent(row.grossMargin)} color={colors.success} />
+              <Metric label={localizedText(lang, "Stock", "المخزون")} value={String(row.stock)} />
             </View>
           </View>
         ))}
@@ -277,29 +277,29 @@ function ProductView({ rows, currency, lang, emptyLabel }: { rows: ProductProfit
   );
 }
 
-function CustomerView({ rows, currency, lang, emptyLabel }: { rows: CustomerProfitRow[]; currency: string; lang: "fr" | "ar"; emptyLabel: string }) {
+function CustomerView({ rows, currency, lang, emptyLabel }: { rows: CustomerProfitRow[]; currency: string; lang: ErpLang; emptyLabel: string }) {
   return (
     <>
       <SimpleBarList
-        title={lang === "ar" ? "أفضل 10 — ربح العملاء" : "Top 10 — Bénéfice client"}
+        title={localizedText(lang, "Top 10 — Bénéfice client", "أفضل 10 — ربح العملاء")}
         rows={rows.slice(0, 10).map((row) => ({ label: row.name, value: row.grossProfit }))}
         currency={currency}
         emptyLabel={emptyLabel}
       />
       <Card>
-        <SectionTitle>{lang === "ar" ? "تفصيل العملاء" : "Détail par client"}</SectionTitle>
+        <SectionTitle>{localizedText(lang, "Détail par client", "تفصيل العملاء")}</SectionTitle>
         {rows.length === 0 ? <Text style={styles.muted}>{emptyLabel}</Text> : null}
         {rows.slice(0, 50).map((row) => (
           <View key={row.id} style={styles.detailCard}>
             <Text style={styles.detailTitle}>{row.name}</Text>
             {row.wilaya ? <Text style={styles.detailSubtitle}>{row.wilaya}</Text> : null}
             <View style={styles.metricsGrid}>
-              <Metric label={lang === "ar" ? "الطلبات" : "Commandes"} value={String(row.totalOrders)} />
-              <Metric label={lang === "ar" ? "رقم الأعمال" : "CA"} value={formatAmount(row.totalRevenue, currency)} />
+              <Metric label={localizedText(lang, "Commandes", "الطلبات")} value={String(row.totalOrders)} />
+              <Metric label={localizedText(lang, "CA", "رقم الأعمال")} value={formatAmount(row.totalRevenue, currency)} />
               <Metric label="COGS" value={formatAmount(row.totalCogs, currency)} />
-              <Metric label={lang === "ar" ? "الربح الإجمالي" : "Bénéfice brut"} value={formatAmount(row.grossProfit, currency)} color={colors.success} />
-              <Metric label={lang === "ar" ? "الهامش" : "Marge"} value={formatPercent(row.grossMargin)} color={colors.success} />
-              <Metric label={lang === "ar" ? "الرصيد" : "Solde"} value={formatAmount(row.currentBalance, currency)} color={row.currentBalance > 0 ? colors.danger : colors.success} />
+              <Metric label={localizedText(lang, "Bénéfice brut", "الربح الإجمالي")} value={formatAmount(row.grossProfit, currency)} color={colors.success} />
+              <Metric label={localizedText(lang, "Marge", "الهامش")} value={formatPercent(row.grossMargin)} color={colors.success} />
+              <Metric label={localizedText(lang, "Solde", "الرصيد")} value={formatAmount(row.currentBalance, currency)} color={row.currentBalance > 0 ? colors.danger : colors.success} />
             </View>
           </View>
         ))}
@@ -308,29 +308,29 @@ function CustomerView({ rows, currency, lang, emptyLabel }: { rows: CustomerProf
   );
 }
 
-function SupplierView({ rows, currency, lang, emptyLabel }: { rows: SupplierReportRow[]; currency: string; lang: "fr" | "ar"; emptyLabel: string }) {
+function SupplierView({ rows, currency, lang, emptyLabel }: { rows: SupplierReportRow[]; currency: string; lang: ErpLang; emptyLabel: string }) {
   return (
     <>
       <SimpleBarList
-        title={lang === "ar" ? "أفضل 10 — المشتريات حسب المورد" : "Top 10 — Achats par fournisseur"}
+        title={localizedText(lang, "Top 10 — Achats par fournisseur", "أفضل 10 — المشتريات حسب المورد")}
         rows={rows.slice(0, 10).map((row) => ({ label: row.name, value: row.totalPurchased }))}
         currency={currency}
         emptyLabel={emptyLabel}
       />
       <Card>
-        <SectionTitle>{lang === "ar" ? "تفصيل الموردين" : "Détail par fournisseur"}</SectionTitle>
+        <SectionTitle>{localizedText(lang, "Détail par fournisseur", "تفصيل الموردين")}</SectionTitle>
         {rows.length === 0 ? <Text style={styles.muted}>{emptyLabel}</Text> : null}
         {rows.slice(0, 50).map((row) => (
           <View key={row.id} style={styles.detailCard}>
             <Text style={styles.detailTitle}>{row.name}</Text>
             {row.contactName ? <Text style={styles.detailSubtitle}>{row.contactName}</Text> : null}
             <View style={styles.metricsGrid}>
-              <Metric label={lang === "ar" ? "أوامر الشراء" : "Bons"} value={String(row.totalPos)} />
-              <Metric label={lang === "ar" ? "المشتريات" : "Acheté"} value={formatAmount(row.totalPurchased, currency)} />
-              <Metric label={lang === "ar" ? "المستلم" : "Reçu"} value={formatAmount(row.totalReceived, currency)} />
-              <Metric label={lang === "ar" ? "المنتجات" : "Produits"} value={String(row.distinctProducts)} />
-              <Metric label={lang === "ar" ? "متوسط التكلفة" : "Coût moyen"} value={formatAmount(row.avgUnitCost, currency)} />
-              <Metric label={lang === "ar" ? "المستحق" : "À payer"} value={formatAmount(row.currentBalance, currency)} color={row.currentBalance > 0 ? colors.danger : colors.success} />
+              <Metric label={localizedText(lang, "Bons", "أوامر الشراء")} value={String(row.totalPos)} />
+              <Metric label={localizedText(lang, "Acheté", "المشتريات")} value={formatAmount(row.totalPurchased, currency)} />
+              <Metric label={localizedText(lang, "Reçu", "المستلم")} value={formatAmount(row.totalReceived, currency)} />
+              <Metric label={localizedText(lang, "Produits", "المنتجات")} value={String(row.distinctProducts)} />
+              <Metric label={localizedText(lang, "Coût moyen", "متوسط التكلفة")} value={formatAmount(row.avgUnitCost, currency)} />
+              <Metric label={localizedText(lang, "À payer", "المستحق")} value={formatAmount(row.currentBalance, currency)} color={row.currentBalance > 0 ? colors.danger : colors.success} />
             </View>
           </View>
         ))}
@@ -544,7 +544,7 @@ function ExpenseDetailsModal({
   search: string;
   category: string;
   currency: string;
-  lang: "fr" | "ar";
+  lang: ErpLang;
   t: (fr: string, ar: string) => string;
   onSearch: (value: string) => void;
   onCategory: (value: string) => void;

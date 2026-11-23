@@ -7,7 +7,7 @@ import {
   getGetErpPriceTiersQueryKey,
 } from "@workspace/api-client-react";
 import { useProtectedRoute } from "@/hooks/use-protected-route";
-import { useLang } from "@/contexts/lang-context";
+import { localizedText, useLang } from "@/contexts/lang-context";
 import { Screen } from "@/components/Screen";
 import { Card, SectionTitle, Divider } from "@/components/ui";
 import { colors } from "@/lib/colors";
@@ -35,7 +35,7 @@ export default function SettingsCustomers() {
           (classifications ?? []).map((c, i) => (
             <View key={c.id}>
               {i > 0 ? <Divider /> : null}
-              <Text style={styles.item}>{lang === "ar" ? c.labelAr : c.labelFr}</Text>
+              <Text style={styles.item}>{localizedText(lang, c.labelFr, c.labelAr)}</Text>
             </View>
           ))
         )}
@@ -48,7 +48,7 @@ export default function SettingsCustomers() {
           (priceTiers ?? []).map((p, i) => (
             <View key={p.id}>
               {i > 0 ? <Divider /> : null}
-              <Text style={styles.item}>{lang === "ar" ? p.labelAr : p.labelFr} ({p.code})</Text>
+              <Text style={styles.item}>{localizedText(lang, p.labelFr, p.labelAr)} ({p.code})</Text>
             </View>
           ))
         )}

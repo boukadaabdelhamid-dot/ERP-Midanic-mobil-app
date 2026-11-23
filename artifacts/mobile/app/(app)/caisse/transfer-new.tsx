@@ -163,7 +163,7 @@ export default function NewCaisseTransfer() {
           />
         ) : null}
 
-        <FormField label={t(`Montant (${currency})`, `المبلغ (${currency})`)} value={amount} onChangeText={setAmount} keyboardType="decimal-pad" />
+        <FormField label={t(`Montant (${currency})`, `المبلغ (${currency})`, `Amount (${currency})`)} value={amount} onChangeText={setAmount} keyboardType="decimal-pad" />
         <FormField label={t("Note (optionnel)", "ملاحظة (اختياري)")} value={notes} onChangeText={setNotes} multiline />
 
         {error ? <Text style={styles.error}>{error}</Text> : null}

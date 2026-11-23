@@ -6,6 +6,7 @@ import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tansta
 import { getActiveBaseUrl } from "@/lib/api";
 import { getToken } from "@/lib/auth-storage";
 import { getGetSuppliersQueryKey } from "@workspace/api-client-react";
+import type { Supplier } from "@workspace/api-client-react";
 import { useStoreContext } from "@/contexts/store-context";
 import { loadSupplierPages, type SearchableSupplier } from "@/lib/supplier-search";
 
@@ -316,7 +317,95 @@ export function useAddToPO() {
 
 export type SupplierRow = SearchableSupplier & {
   phone: string | null;
+  email?: string | null;
 };
+
+export type SupplierDirectoryPage = {
+  data: SupplierRow[];
+  total: number;
+  missingLocationTotal: number;
+  page: number;
+  limit: number;
+};
+
+export type SupplierDetails = Supplier & {
+  locationAccuracyMeters?: number | null;
+  locationCapturedAt?: string | null;
+};
+
+export function useSupplierDirectory({
+  enabled,
+  search,
+  missingLocation,
+}: {
+  enabled: boolean;
+  search: string;
+  missingLocation: boolean;
+}) {
+  const { currentStoreId } = useStoreContext();
+  const baseUrl = getActiveBaseUrl();
+
+  return useInfiniteQuery<SupplierDirectoryPage>({
+    queryKey: [
+      ...getGetSuppliersQueryKey(),
+      "directory",
+      baseUrl,
+      currentStoreId,
+      search,
+      missingLocation,
+    ],
+    initialPageParam: 1,
+    queryFn: ({ pageParam, signal }) => {
+      const params = new URLSearchParams({
+        page: String(pageParam),
+        limit: "50",
+      });
+      if (search) params.set("search", search);
+      if (missingLocation) params.set("missingLocation", "true");
+      return erpFetch(`/api/erp/suppliers?${params.toString()}`, { signal }) as Promise<SupplierDirectoryPage>;
+    },
+    getNextPageParam: (lastPage) =>
+      lastPage.page * lastPage.limit < lastPage.total
+        ? lastPage.page + 1
+        : undefined,
+    enabled: enabled && currentStoreId != null,
+    staleTime: 0,
+    refetchOnMount: "always",
+  });
+}
+
+export function useSupplierById(supplierId: number, enabled: boolean) {
+  const { currentStoreId } = useStoreContext();
+  const baseUrl = getActiveBaseUrl();
+  return useQuery<SupplierDetails>({
+    queryKey: [...getGetSuppliersQueryKey(), "detail", baseUrl, currentStoreId, supplierId],
+    queryFn: async ({ signal }) => {
+      try {
+        return await erpFetch(`/api/erp/suppliers/${supplierId}`, { signal }) as SupplierDetails;
+      } catch (error) {
+        if (signal.aborted || !isSupplierDetailRouteMissing(error)) throw error;
+
+        // Older company servers may not yet expose the single-supplier route.
+        // Their paginated directory still contains the same supplier record.
+        const suppliers = await loadSupplierPages<SupplierDetails>((page, limit) => {
+          const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+          return erpFetch(`/api/erp/suppliers?${params.toString()}`, { signal });
+        });
+        const supplier = suppliers.find((item) => item.id === supplierId);
+        if (supplier) return supplier;
+        throw error;
+      }
+    },
+    enabled: enabled && currentStoreId != null && Number.isInteger(supplierId) && supplierId > 0,
+    staleTime: 0,
+    refetchOnMount: "always",
+  });
+}
+
+function isSupplierDetailRouteMissing(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return /(?:\b404\b|not found|cannot get|unexpected token)/i.test(error.message);
+}
 
 export function useSuppliersAll(enabled: boolean) {
   const { currentStoreId } = useStoreContext();

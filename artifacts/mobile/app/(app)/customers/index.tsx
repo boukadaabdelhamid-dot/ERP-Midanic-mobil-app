@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "expo-router";
 import { View } from "react-native";
 import { useGetErpCustomers, getGetErpCustomersQueryKey } from "@workspace/api-client-react";
@@ -6,7 +6,7 @@ import { useProtectedRoute } from "@/hooks/use-protected-route";
 import { useLang } from "@/contexts/lang-context";
 import { ListScreen, SearchBar } from "@/components/ListScreen";
 import { EntityRow } from "@/components/EntityRow";
-import { Badge } from "@/components/ui";
+import { Badge, Button, ErrorState } from "@/components/ui";
 import { Fab } from "@/components/Fab";
 import { getContactBalance } from "@/lib/contact-balance";
 
@@ -15,17 +15,44 @@ export default function CustomersList() {
   const { t, lang } = useLang();
   const router = useRouter();
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const currency = lang === "ar" ? "دج" : "DA";
 
-  const customersParams = { search: search || undefined, limit: 50 };
-  const { data, isLoading, refetch, isRefetching } = useGetErpCustomers(customersParams, {
-    query: { enabled: ready, queryKey: getGetErpCustomersQueryKey(customersParams) },
+  useEffect(() => {
+    const timeout = setTimeout(() => setDebouncedSearch(search.trim()), 250);
+    return () => clearTimeout(timeout);
+  }, [search]);
+
+  const customersParams = { search: debouncedSearch || undefined, limit: 50 };
+  const { data, isLoading, isError, refetch, isRefetching } = useGetErpCustomers(customersParams, {
+    query: {
+      enabled: ready,
+      queryKey: getGetErpCustomersQueryKey(customersParams),
+      staleTime: 90_000,
+      placeholderData: (previousData) => previousData,
+    },
   });
   const customers = (data as any)?.data ?? [];
 
   if (!ready) return null;
 
   const canCreate = isAdmin || can("customers", "create");
+  if (isError && !data) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", padding: 24, gap: 12 }}>
+        <ErrorState
+          title={t("Impossible de charger les clients", "تعذر تحميل الزبائن")}
+          subtitle={t("Vérifiez la connexion puis réessayez.", "تحقق من الاتصال ثم أعد المحاولة.")}
+        />
+        <Button
+          label={t("Réessayer", "إعادة المحاولة")}
+          onPress={() => { void refetch(); }}
+          loading={isRefetching}
+          testID="button-retry-customers"
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1 }}>

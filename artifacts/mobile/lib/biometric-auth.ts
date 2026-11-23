@@ -6,14 +6,22 @@ const BIOMETRIC_ENABLED_KEY = "midanic_erp_biometric_enabled";
 
 export async function isBiometricAvailable(): Promise<boolean> {
   if (Platform.OS === "web") return false;
-  const hasHardware = await LocalAuthentication.hasHardwareAsync();
-  if (!hasHardware) return false;
-  return LocalAuthentication.isEnrolledAsync();
+  try {
+    const hasHardware = await LocalAuthentication.hasHardwareAsync();
+    if (!hasHardware) return false;
+    return await LocalAuthentication.isEnrolledAsync();
+  } catch {
+    return false;
+  }
 }
 
 export async function getBiometricEnabled(): Promise<boolean> {
   if (Platform.OS === "web") return false;
-  return (await SecureStore.getItemAsync(BIOMETRIC_ENABLED_KEY)) === "true";
+  try {
+    return (await SecureStore.getItemAsync(BIOMETRIC_ENABLED_KEY)) === "true";
+  } catch {
+    return false;
+  }
 }
 
 export async function setBiometricEnabled(enabled: boolean): Promise<void> {
@@ -25,13 +33,21 @@ export async function setBiometricEnabled(enabled: boolean): Promise<void> {
   }
 }
 
-export async function authenticateWithBiometric(): Promise<boolean> {
+export async function authenticateWithBiometric(
+  promptMessage = "Déverrouiller Midanic",
+  cancelLabel = "Annuler",
+  fallbackLabel = "Utiliser le mot de passe",
+): Promise<boolean> {
   if (!(await isBiometricAvailable())) return false;
-  const result = await LocalAuthentication.authenticateAsync({
-    promptMessage: "Déverrouiller Midanic",
-    cancelLabel: "Annuler",
-    fallbackLabel: "Utiliser le mot de passe",
-    disableDeviceFallback: false,
-  });
-  return result.success;
+  try {
+    const result = await LocalAuthentication.authenticateAsync({
+      promptMessage,
+      cancelLabel,
+      fallbackLabel,
+      disableDeviceFallback: false,
+    });
+    return result.success;
+  } catch {
+    return false;
+  }
 }

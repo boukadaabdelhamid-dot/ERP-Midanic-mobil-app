@@ -543,9 +543,9 @@ export default function PosScreen() {
             {scanStatus.kind === "searching"
               ? t("Looking for the scanned barcode...", "جارٍ البحث عن الباركود...")
               : scanStatus.kind === "found"
-                ? t(`Found: ${lang === "ar" ? scannedProduct?.nameAr : scannedProduct?.nameEn}. Select it below to add it.`, `تم العثور على: ${lang === "ar" ? scannedProduct?.nameAr : scannedProduct?.nameEn}. اختره أدناه لإضافته.`)
+                ? t(`Found: ${lang === "ar" ? scannedProduct?.nameAr : scannedProduct?.nameEn}. Select it below to add it.`, `تم العثور على: ${lang === "ar" ? scannedProduct?.nameAr : scannedProduct?.nameEn}. اختره أدناه لإضافته.`, `Found: ${scannedProduct?.nameEn}. Select it below to add it.`)
                 : scanStatus.kind === "notFound"
-                  ? t(`No product found for barcode ${scanStatus.code}.`, `لم يُعثر على منتج بالباركود ${scanStatus.code}.`)
+                  ? t(`No product found for barcode ${scanStatus.code}.`, `لم يُعثر على منتج بالباركود ${scanStatus.code}.`, `No product found for barcode ${scanStatus.code}.`)
                   : scanStatus.kind === "outOfStock"
                     ? t("This product is out of stock.", "هذا المنتج غير متوفر في المخزون.")
                     : t("Could not check this barcode. Use product search or try again.", "تعذر التحقق من الباركود. استخدم البحث أو حاول مرة أخرى.")}

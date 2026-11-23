@@ -75,6 +75,7 @@ export default function AppLayout() {
       <Drawer.Screen name="customers/index" options={{ title: t("Clients", "العملاء") }} />
       <Drawer.Screen name="customers/new" options={{ title: t("Nouveau client", "عميل جديد"), drawerItemStyle: { display: "none" } }} />
       <Drawer.Screen name="customers/[id]" options={{ title: t("Client", "العميل") }} />
+      <Drawer.Screen name="customers/[id]/refund" options={{ title: t("Rembourser le client", "استرداد للزبون"), drawerItemStyle: { display: "none" } }} />
       <Drawer.Screen name="caisse/index" options={{ title: t("Caisse", "الصندوق") }} />
       <Drawer.Screen name="caisse/[id]" options={{ title: t("Caisse", "الصندوق"), drawerItemStyle: { display: "none" } }} />
       <Drawer.Screen name="caisse/transfers" options={{ title: t("Transferts caisse", "تحويلات الصندوق"), drawerItemStyle: { display: "none" } }} />
@@ -93,6 +94,7 @@ export default function AppLayout() {
       <Drawer.Screen name="suppliers/index" options={{ title: t("Fournisseurs", "الموردون") }} />
       <Drawer.Screen name="suppliers/new" options={{ title: t("Nouveau fournisseur", "مورد جديد"), drawerItemStyle: { display: "none" } }} />
       <Drawer.Screen name="suppliers/[id]" options={{ title: t("Fournisseur", "المورد") }} />
+      <Drawer.Screen name="suppliers/[id]/payment" options={{ title: t("Paiement fournisseur", "دفعة المورد"), drawerItemStyle: { display: "none" } }} />
       <Drawer.Screen name="suppliers/[id]/edit" options={{ title: t("Modifier le fournisseur", "تعديل المورد"), drawerItemStyle: { display: "none" } }} />
       <Drawer.Screen name="purchase-orders/index" options={{ title: t("Bons d'achat", "أوامر الشراء") }} />
       <Drawer.Screen name="purchase-orders/new" options={{ title: t("Nouveau bon d'achat", "أمر شراء جديد"), drawerItemStyle: { display: "none" } }} />

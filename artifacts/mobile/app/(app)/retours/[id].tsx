@@ -6,7 +6,7 @@ import {
   getGetAdminRetourQueryKey,
 } from "@workspace/api-client-react";
 import { useProtectedRoute } from "@/hooks/use-protected-route";
-import { useLang } from "@/contexts/lang-context";
+import { localeForLanguage, useLang, type ErpLang } from "@/contexts/lang-context";
 import { Screen } from "@/components/Screen";
 import { Card, Button, LoadingView, SectionTitle, Badge, Divider, ErrorState } from "@/components/ui";
 import { colors } from "@/lib/colors";
@@ -111,11 +111,11 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-function formatDate(value: string | undefined, lang: string) {
+function formatDate(value: string | undefined, lang: ErpLang) {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString(lang === "ar" ? "ar-DZ" : "fr-FR");
+  return date.toLocaleDateString(localeForLanguage(lang));
 }
 
 const styles = StyleSheet.create({

@@ -187,7 +187,7 @@ export default function DrawerContent(props: DrawerContentComponentProps) {
       <View style={styles.footer}>
         <Pressable style={styles.langSwitch} onPress={toggleLanguage}>
           <Feather name="globe" size={16} color={colors.textMuted} />
-          <Text style={styles.itemLabel}>{lang === "ar" ? "Français" : "العربية"}</Text>
+          <Text style={styles.itemLabel}>{lang === "ar" ? "English" : lang === "en" ? "Français" : "العربية"}</Text>
         </Pressable>
         <Pressable style={styles.logout} onPress={() => logout()}>
           <Feather name="log-out" size={16} color={colors.danger} />

@@ -10,7 +10,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { Feather } from "@expo/vector-icons";
 import { useProtectedRoute } from "@/hooks/use-protected-route";
-import { useLang } from "@/contexts/lang-context";
+import { localizedText, useLang } from "@/contexts/lang-context";
 import { colors } from "@/lib/colors";
 import { erpFetch } from "@/hooks/use-smart-purchase";
 import { DateField } from "@/components/DateField";
@@ -554,7 +554,7 @@ function VentesTab({ t, currency, canViewProfit }: { t: (fr: string, ar: string)
           {totalPages > 1 && (
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingTop: 8 }}>
               <Text style={{ fontSize: 11, color: colors.textMuted }}>
-                {t(`${Math.min((page-1)*PAGE+1,rows.length)}-${Math.min(page*PAGE,rows.length)} / ${rows.length}`, `${Math.min((page-1)*PAGE+1,rows.length)}-${Math.min(page*PAGE,rows.length)} / ${rows.length}`)}
+                {`${Math.min((page-1)*PAGE+1,rows.length)}-${Math.min(page*PAGE,rows.length)} / ${rows.length}`}
               </Text>
               <View style={{ flexDirection: "row", gap: 6 }}>
                 <Pressable onPress={() => setPage(p => Math.max(1, p-1))} disabled={page <= 1} style={[pg.btn, page <= 1 && { opacity: 0.3 }]}>
@@ -768,7 +768,7 @@ function VentePlusTab({ t, currency, canViewProfit }: { t: (fr: string, ar: stri
           {/* Grand total */}
           <View style={[mt.head, { backgroundColor: "#F1E9D6", borderRadius: 8, borderWidth: 1, borderColor: colors.accent }]}>
             <Text style={{ flex: 1, fontSize: 11, fontWeight: "800", color: colors.primary }}>TOTAL ({sorted.length})</Text>
-            <Text style={{ fontSize: 11, fontWeight: "700", color: colors.primary }}>Qté: {gTot.qte.toLocaleString()}</Text>
+              <Text style={{ fontSize: 11, fontWeight: "700", color: colors.primary }}>{t("Qté:", "الكمية:")} {gTot.qte.toLocaleString()}</Text>
             <Text style={{ fontSize: 11, fontWeight: "800", color: colors.primary, marginLeft: 8 }}>{fmtNum(gTot.montant)} {currency}</Text>
             {canViewProfit && <Text style={{ fontSize: 11, fontWeight: "800", color: gTot.benefice < 0 ? colors.danger : colors.success, marginLeft: 8 }}>{fmtNum(gTot.benefice)} {currency}</Text>}
           </View>

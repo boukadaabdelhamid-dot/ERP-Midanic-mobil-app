@@ -10,21 +10,22 @@ export type StatusAction = {
   status: OrderStatusValue;
   label: string;
   labelAr: string;
+  labelEn: string;
   destructive?: boolean;
 };
 
 const TRANSITIONS: Record<string, StatusAction[]> = {
   pending: [
-    { status: "processing", label: "Marquer en traitement", labelAr: "وضع علامة قيد المعالجة" },
-    { status: "cancelled", label: "Annuler la commande", labelAr: "إلغاء الطلب", destructive: true },
+    { status: "processing", label: "Marquer en traitement", labelAr: "وضع علامة قيد المعالجة", labelEn: "Mark as processing" },
+    { status: "cancelled", label: "Annuler la commande", labelAr: "إلغاء الطلب", labelEn: "Cancel order", destructive: true },
   ],
   processing: [
-    { status: "shipped", label: "Marquer comme expédiée", labelAr: "وضع علامة تم الشحن" },
-    { status: "cancelled", label: "Annuler la commande", labelAr: "إلغاء الطلب", destructive: true },
+    { status: "shipped", label: "Marquer comme expédiée", labelAr: "وضع علامة تم الشحن", labelEn: "Mark as shipped" },
+    { status: "cancelled", label: "Annuler la commande", labelAr: "إلغاء الطلب", labelEn: "Cancel order", destructive: true },
   ],
   shipped: [
-    { status: "delivered", label: "Marquer comme livrée", labelAr: "وضع علامة تم التسليم" },
-    { status: "cancelled", label: "Annuler la commande", labelAr: "إلغاء الطلب", destructive: true },
+    { status: "delivered", label: "Marquer comme livrée", labelAr: "وضع علامة تم التسليم", labelEn: "Mark as delivered" },
+    { status: "cancelled", label: "Annuler la commande", labelAr: "إلغاء الطلب", labelEn: "Cancel order", destructive: true },
   ],
   delivered: [],
   cancelled: [],

@@ -1,20 +1,20 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { Feather } from "@expo/vector-icons";
 import {
   useGetSupplierOperations,
-  useGetSuppliers,
-  getGetSuppliersQueryKey,
   getGetSupplierOperationsQueryKey,
 } from "@workspace/api-client-react";
 import { useProtectedRoute } from "@/hooks/use-protected-route";
-import { useLang } from "@/contexts/lang-context";
+import { localeForLanguage, useLang, type ErpLang } from "@/contexts/lang-context";
 import { Screen } from "@/components/Screen";
 import { Card, Button, LoadingView, SectionTitle, Divider, ErrorState } from "@/components/ui";
 import { colors } from "@/lib/colors";
 import { getContactBalance } from "@/lib/contact-balance";
 import { ContactHistoryRow } from "@/components/ContactHistoryRow";
 import { SupplierDirectionsButton } from "@/components/SupplierDirectionsButton";
+import { useSupplierById } from "@/hooks/use-smart-purchase";
 
 export default function SupplierDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -24,20 +24,36 @@ export default function SupplierDetail() {
   const currency = lang === "ar" ? "دج" : "DA";
   const supplierId = Number(id);
 
-  // No single-supplier GET endpoint is generated; look it up from the list.
-  const { data: list, isLoading } = useGetSuppliers({
-    query: { enabled: ready, queryKey: getGetSuppliersQueryKey() },
-  });
-  const supplier = ((list as unknown as { data?: any[] })?.data ?? []).find((s: any) => s.id === supplierId);
+  const { data: supplier, isLoading, isError, refetch, isRefetching } = useSupplierById(supplierId, ready);
   const { data: ops, isLoading: operationsLoading } = useGetSupplierOperations(supplierId, {
-    query: { enabled: ready && !!supplierId, queryKey: getGetSupplierOperationsQueryKey(supplierId) },
+    query: {
+      enabled: ready && Number.isInteger(supplierId) && supplierId > 0,
+      queryKey: getGetSupplierOperationsQueryKey(supplierId),
+    },
   });
 
   if (!ready) return null;
   if (isLoading) return <LoadingView />;
+  if (isError && !supplier) {
+    return (
+      <Screen>
+        <ErrorState
+          title={t("Impossible de charger le fournisseur", "تعذر تحميل المورد")}
+          subtitle={t("Vérifiez la connexion puis réessayez.", "تحقق من الاتصال ثم أعد المحاولة.")}
+        />
+        <Button
+          label={t("Réessayer", "إعادة المحاولة")}
+          onPress={() => { void refetch(); }}
+          loading={isRefetching}
+          testID="button-retry-supplier-detail"
+        />
+      </Screen>
+    );
+  }
   if (!supplier) return <ErrorState title={t("Fournisseur introuvable", "المورد غير موجود")} />;
 
   const canEdit = isAdmin || can("suppliers", "edit");
+  const canCreatePayment = isAdmin || can("suppliers", "create");
   const canViewPurchases = isAdmin || can("purchases", "view");
   const operations = Array.isArray((ops as any)?.operations) ? (ops as any).operations : [];
   const balance = Number((ops as any)?.contactBalance ?? getContactBalance(supplier));
@@ -91,6 +107,15 @@ export default function SupplierDetail() {
           {balance.toLocaleString("fr-FR")} {currency}
         </Text>
       </Card>
+
+      {canCreatePayment ? (
+        <Button
+          label={t("Enregistrer un paiement", "تسجيل دفعة للمورد")}
+          icon={<Feather name="credit-card" size={17} color={colors.surface} />}
+          onPress={() => router.push(`/suppliers/${supplierId}/payment` as never)}
+          testID="button-new-supplier-payment"
+        />
+      ) : null}
 
       <Card>
         <SectionTitle>{t("Historique des achats", "سجل المشتريات")}</SectionTitle>
@@ -162,17 +187,17 @@ export default function SupplierDetail() {
   );
 }
 
-function formatDate(value: string | undefined, lang: string) {
+function formatDate(value: string | undefined, lang: ErpLang) {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString(lang === "ar" ? "ar-DZ" : "fr-FR");
+  return date.toLocaleDateString(localeForLanguage(lang));
 }
 
-function formatDateTime(value: string, lang: string) {
+function formatDateTime(value: string, lang: ErpLang) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString(lang === "ar" ? "ar-DZ" : "fr-FR");
+  return date.toLocaleString(localeForLanguage(lang));
 }
 
 function supplierOperationLabel(

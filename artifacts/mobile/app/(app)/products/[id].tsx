@@ -19,7 +19,7 @@ import {
   useGetProductHistory,
 } from "@workspace/api-client-react";
 import { useProtectedRoute } from "@/hooks/use-protected-route";
-import { useLang } from "@/contexts/lang-context";
+import { localizedText, useLang } from "@/contexts/lang-context";
 import { Screen } from "@/components/Screen";
 import { Badge, Button, Card, Divider, EmptyState, ErrorState, LoadingView, SectionTitle } from "@/components/ui";
 import { colors } from "@/lib/colors";
@@ -64,15 +64,15 @@ export default function ProductDetail() {
   }, [categoriesQ.data, lang, productQ.data?.categoryId]);
   const familyName = useMemo(() => {
     const family = familiesQ.data?.items.find((item) => item.id === productQ.data?.familyId);
-    return family ? (lang === "ar" ? family.nameAr : family.nameFr) : "—";
+    return family ? localizedText(lang, family.nameFr, family.nameAr) : "—";
   }, [familiesQ.data?.items, lang, productQ.data?.familyId]);
   const brandName = useMemo(() => {
     const brand = brandsQ.data?.items.find((item) => item.id === productQ.data?.brandId);
-    return brand ? (lang === "ar" ? brand.nameAr : brand.nameFr) : productQ.data?.brand ?? "—";
+    return brand ? localizedText(lang, brand.nameFr, brand.nameAr) : productQ.data?.brand ?? "—";
   }, [brandsQ.data?.items, lang, productQ.data?.brand, productQ.data?.brandId]);
   const colorName = useMemo(() => {
     const color = colorsQ.data?.items.find((item) => item.id === productQ.data?.colorId);
-    return color ? (lang === "ar" ? color.nameAr : color.nameFr) : productQ.data?.color ?? "—";
+    return color ? localizedText(lang, color.nameFr, color.nameAr) : productQ.data?.color ?? "—";
   }, [colorsQ.data?.items, lang, productQ.data?.color, productQ.data?.colorId]);
 
   if (!ready) return null;
@@ -138,7 +138,7 @@ export default function ProductDetail() {
                 style={[styles.tab, tab === item.key && styles.tabActive, disabled && styles.tabDisabled]}
                 testID={`product-detail-tab-${item.key}`}
               >
-                <Text style={[styles.tabText, tab === item.key && styles.tabTextActive, disabled && styles.tabTextDisabled]}>{lang === "ar" ? item.ar : item.fr}</Text>
+                <Text style={[styles.tabText, tab === item.key && styles.tabTextActive, disabled && styles.tabTextDisabled]}>{localizedText(lang, item.fr, item.ar)}</Text>
               </Pressable>
             );
           })}

@@ -19,9 +19,9 @@ export default function SettingsLanguages() {
     <Screen>
       <Card>
         <SectionTitle>{t("Langue de l'interface", "لغة الواجهة")}</SectionTitle>
-        {(["fr", "ar"] as const).map((l) => (
+        {(["fr", "ar", "en"] as const).map((l) => (
           <Pressable key={l} style={styles.row} onPress={() => selectLanguage(l)} testID={`option-language-${l}`}>
-            <Text style={styles.label}>{l === "fr" ? "Français" : "العربية"}</Text>
+            <Text style={styles.label}>{l === "fr" ? "Français" : l === "ar" ? "العربية" : "English"}</Text>
             {lang === l ? <Feather name="check" size={18} color={colors.primary} /> : null}
           </Pressable>
         ))}

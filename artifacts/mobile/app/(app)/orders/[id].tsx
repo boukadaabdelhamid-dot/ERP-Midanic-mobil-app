@@ -51,11 +51,11 @@ export default function OrderDetail() {
   const canCreateRetour = (isAdmin || can("orders", "create")) && !["draft", "cancelled"].includes(order.status);
   const statusActions = getStatusActions(order.status);
 
-  function handleStatusChange(status: string, label: string, labelAr: string, destructive?: boolean) {
+  function handleStatusChange(status: string, label: string, labelAr: string, labelEn: string, destructive?: boolean) {
     confirm({
-      title: t(`Confirmer : ${label}`, `تأكيد: ${labelAr}`),
+      title: t(`Confirmer : ${label}`, `تأكيد: ${labelAr}`, `Confirm: ${labelEn}`),
       titleAr: `تأكيد: ${labelAr}`,
-      message: t(`Commande #${order!.id}`, `الطلب #${order!.id}`),
+      message: t(`Commande #${order!.id}`, `الطلب #${order!.id}`, `Order #${order!.id}`),
       destructive,
     }).then((ok) => {
       if (!ok) return;
@@ -154,9 +154,9 @@ export default function OrderDetail() {
             {statusActions.map((action) => (
               <Button
                 key={action.status}
-                label={t(action.label, action.labelAr)}
+                label={t(action.label, action.labelAr, action.labelEn)}
                 variant={action.destructive ? "danger" : "primary"}
-                onPress={() => handleStatusChange(action.status, action.label, action.labelAr, action.destructive)}
+                onPress={() => handleStatusChange(action.status, action.label, action.labelAr, action.labelEn, action.destructive)}
                 loading={updateStatus.isPending}
                 testID={`button-order-status-${action.status}`}
               />
@@ -197,7 +197,7 @@ export default function OrderDetail() {
                   <Text style={styles.cartName} numberOfLines={1}>
                     {(lang === "ar" ? it.product?.nameAr : it.product?.nameEn) ?? `#${it.product.id}`}
                   </Text>
-                  <Text style={styles.cartSub}>{t(`Commandé: ${it.quantity}`, `المطلوب: ${it.quantity}`)}</Text>
+                  <Text style={styles.cartSub}>{t(`Commandé: ${it.quantity}`, `المطلوب: ${it.quantity}`, `Ordered: ${it.quantity}`)}</Text>
                 </View>
                 <QuantityStepper
                   value={retourQty[it.product.id] ?? 0}

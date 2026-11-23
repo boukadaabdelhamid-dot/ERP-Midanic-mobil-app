@@ -12,7 +12,7 @@ import {
   type Transaction,
 } from "@workspace/api-client-react";
 import { useProtectedRoute } from "@/hooks/use-protected-route";
-import { useLang } from "@/contexts/lang-context";
+import { localeForLanguage, useLang } from "@/contexts/lang-context";
 import { Card, SectionTitle, Badge, Button, LoadingView } from "@/components/ui";
 import { DateField } from "@/components/DateField";
 import { Fab } from "@/components/Fab";
@@ -308,7 +308,8 @@ export default function Accounting() {
         <Text style={styles.pageCount}>
           {t(
             `Affichage ${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, filteredTx.length)} sur ${filteredTx.length} transaction(s)`,
-            `عرض ${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, filteredTx.length)} من ${filteredTx.length}`
+            `عرض ${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, filteredTx.length)} من ${filteredTx.length}`,
+            `Showing ${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, filteredTx.length)} of ${filteredTx.length} transactions`
           )}
         </Text>
       )}
@@ -395,7 +396,7 @@ export default function Accounting() {
               </View>
               <View style={styles.rowBetween}>
                 <Badge label={t(fr, ar)} tone={isIncome ? "success" : "danger"} />
-                <Text style={styles.mutedSmall}>{new Date(tx.date).toLocaleDateString("fr-FR")}</Text>
+                <Text style={styles.mutedSmall}>{new Date(tx.date).toLocaleDateString(localeForLanguage(lang))}</Text>
               </View>
               {tx.reference ? <Text style={styles.mutedSmall}>{tx.reference}</Text> : null}
             </Card>

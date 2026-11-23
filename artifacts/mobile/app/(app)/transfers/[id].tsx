@@ -16,7 +16,7 @@ import {
 } from "@workspace/api-client-react";
 import { useProtectedRoute } from "@/hooks/use-protected-route";
 import { useStoreContext } from "@/contexts/store-context";
-import { useLang } from "@/contexts/lang-context";
+import { localeForLanguage, useLang } from "@/contexts/lang-context";
 import { useApiFeedback } from "@/hooks/use-api-feedback";
 import { useConfirm } from "@/contexts/confirm-context";
 import { Screen } from "@/components/Screen";
@@ -136,7 +136,7 @@ export default function TransferDetail() {
         ) : (
           items.map((it: any, i: number) => {
             const quantities = getTransferQuantities(it);
-            const formatQuantity = (value: number) => value.toLocaleString(lang === "ar" ? "ar-DZ" : "fr-DZ", { maximumFractionDigits: 12 });
+            const formatQuantity = (value: number) => value.toLocaleString(localeForLanguage(lang), { maximumFractionDigits: 12 });
             const sentLabel = tr.status === "in_transit" || tr.status === "received"
               ? t("Envoyé", "الكمية المرسلة")
               : t("À transférer", "الكمية المطلوب تحويلها");

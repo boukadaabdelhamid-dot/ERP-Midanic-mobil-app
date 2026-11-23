@@ -33,7 +33,7 @@ import {
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useProtectedRoute } from "@/hooks/use-protected-route";
-import { useLang } from "@/contexts/lang-context";
+import { localeForLanguage, useLang, type ErpLang } from "@/contexts/lang-context";
 import { useStoreContext } from "@/contexts/store-context";
 import { useApiFeedback } from "@/hooks/use-api-feedback";
 import { useConfirm } from "@/contexts/confirm-context";
@@ -440,7 +440,7 @@ export default function ManufacturingScreen() {
                 <Pressable onPress={() => setExpandedOrderIds((ids) => expanded ? ids.filter((id) => id !== order.id) : [...ids, order.id])} style={styles.cardHeading}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.cardTitle}>{productName(output)} · #{order.id}</Text>
-                    <Text style={styles.meta}>{numberText(order.quantity)} {t("lot(s)", "دفعة")} · {new Date(order.createdAt).toLocaleDateString(lang === "ar" ? "ar-DZ" : "fr-FR")}</Text>
+                    <Text style={styles.meta}>{numberText(order.quantity)} {t("lot(s)", "دفعة")} · {new Date(order.createdAt).toLocaleDateString(localeForLanguage(lang))}</Text>
                   </View>
                   <View style={[styles.statusPill, order.status === "planned" ? styles.statusPlanned : order.status === "completed" ? styles.statusActive : styles.statusOff]}>
                     <Text style={[styles.statusText, order.status === "planned" ? styles.statusPlannedText : order.status === "completed" ? styles.statusActiveText : styles.statusOffText]}>{statusText}</Text>
@@ -544,7 +544,7 @@ function ReplenishmentCard({
   item, lang, t, productName, actionLabel, actionIcon, onAction, disabled,
 }: {
   item: ManufacturingReplenishmentItem;
-  lang: "ar" | "fr";
+  lang: ErpLang;
   t: (fr: string, ar: string) => string;
   productName: string;
   actionLabel: string;
@@ -604,7 +604,7 @@ function RecipeModal({
   busy: boolean;
   error: string;
   t: (fr: string, ar: string) => string;
-  lang: "ar" | "fr";
+  lang: ErpLang;
   onClose: () => void;
   onSave: () => void;
   onTogglePicker: () => void;
@@ -698,7 +698,7 @@ function OrderModal({
   busy: boolean;
   error: string;
   t: (fr: string, ar: string) => string;
-  lang: "ar" | "fr";
+  lang: ErpLang;
   onClose: () => void;
   onSave: () => void;
   onTogglePicker: () => void;

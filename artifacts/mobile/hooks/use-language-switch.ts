@@ -4,24 +4,26 @@ import { useConfirm } from "@/contexts/confirm-context";
 
 /**
  * Shared language-switch behavior for every language toggle in the app
- * (login screen, drawer footer, settings). Persists the choice, then — since
- * native RTL layout mirroring only takes effect after a JS reload — asks the
- * user to restart and reloads if they agree.
+ * (login screen, drawer footer, settings). Persists the choice and asks for a
+ * restart only when switching to or from Arabic changes the native RTL layout.
  */
 export function useLanguageSwitch() {
   const { lang, setLang } = useLang();
   const { confirm } = useConfirm();
+  const nextLanguage: ErpLang = lang === "fr" ? "ar" : lang === "ar" ? "en" : "fr";
 
   const selectLanguage = async (next: ErpLang) => {
     if (next === lang) return;
     setLang(next);
 
+    const directionChanges = (lang === "ar") !== (next === "ar");
+    if (!directionChanges) return;
+
     const shouldReload = await confirm({
       title: "Redémarrer l'application ?",
       titleAr: "إعادة تشغيل التطبيق؟",
-      message:
-        "La mise en page doit être inversée pour l'arabe/le français. Redémarrer maintenant pour appliquer le changement.",
-      messageAr: "يجب عكس تخطيط الواجهة للعربية/الفرنسية. أعد التشغيل الآن لتطبيق التغيير.",
+      message: "Le sens de lecture change. Redémarrer maintenant pour appliquer le changement.",
+      messageAr: "يتغير اتجاه الواجهة. أعد التشغيل الآن لتطبيق التغيير.",
       confirmLabel: "Redémarrer",
       confirmLabelAr: "إعادة التشغيل",
       cancelLabel: "Plus tard",
@@ -39,5 +41,5 @@ export function useLanguageSwitch() {
     // mirrored layout applies the next time the app is launched.
   };
 
-  return { toggleLanguage: () => selectLanguage(lang === "ar" ? "fr" : "ar"), selectLanguage };
+  return { toggleLanguage: () => selectLanguage(nextLanguage), selectLanguage };
 }

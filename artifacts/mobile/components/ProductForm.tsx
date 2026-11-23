@@ -10,7 +10,7 @@ import {
   getGetErpSettingsProductsTypesQueryKey,
   type Category, type Product, type ProductImage,
 } from "@workspace/api-client-react";
-import { useLang } from "@/contexts/lang-context";
+import { localizedText, useLang } from "@/contexts/lang-context";
 import { Card, Button, FormField, SectionTitle, Divider } from "@/components/ui";
 import { PickerField } from "@/components/Picker";
 import { colors } from "@/lib/colors";
@@ -219,7 +219,7 @@ export function ProductForm({
       ["minStock", t("seuil d'alerte", "حد التنبيه")],
     ] as const) {
       const value = values[key];
-      if (value.trim() && (!isValidNumber(value) || parseNumber(value) < 0)) next[key] = t(`Valeur invalide: ${label}`, `قيمة غير صالحة: ${label}`);
+      if (value.trim() && (!isValidNumber(value) || parseNumber(value) < 0)) next[key] = t(`Valeur invalide: ${label}`, `قيمة غير صالحة: ${label}`, `Invalid value: ${label}`);
     }
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -317,7 +317,7 @@ export function ProductForm({
               value={selectedFamily}
               items={families}
               keyExtractor={(item) => String(item.id)}
-              labelExtractor={(item) => lang === "ar" ? item.nameAr : item.nameFr}
+              labelExtractor={(item) => localizedText(lang, item.nameFr, item.nameAr)}
               onChange={(item) => set("familyId", item.id)}
               allowClear
               onClear={() => set("familyId", null)}
@@ -328,7 +328,7 @@ export function ProductForm({
               value={selectedBrand}
               items={brands}
               keyExtractor={(item) => String(item.id)}
-              labelExtractor={(item) => lang === "ar" ? item.nameAr : item.nameFr}
+              labelExtractor={(item) => localizedText(lang, item.nameFr, item.nameAr)}
               onChange={(item) => set("brandId", item.id)}
               allowClear
               onClear={() => set("brandId", null)}
@@ -339,7 +339,7 @@ export function ProductForm({
               value={selectedColor}
               items={productColors}
               keyExtractor={(item) => String(item.id)}
-              labelExtractor={(item) => lang === "ar" ? item.nameAr : item.nameFr}
+              labelExtractor={(item) => localizedText(lang, item.nameFr, item.nameAr)}
               onChange={(item) => set("colorId", item.id)}
               allowClear
               onClear={() => set("colorId", null)}
@@ -358,7 +358,7 @@ export function ProductForm({
               value={selectedType}
               items={productTypes}
               keyExtractor={(item) => String(item.id)}
-              labelExtractor={(item) => lang === "ar" ? item.nameAr : item.nameFr}
+              labelExtractor={(item) => localizedText(lang, item.nameFr, item.nameAr)}
               onChange={(item) => set("catalogueType", item.nameFr)}
               placeholder={t("ARTICLE", "مقال")}
             />

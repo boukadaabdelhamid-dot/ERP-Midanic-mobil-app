@@ -22,7 +22,7 @@ import {
   type ProductStockLevel,
 } from "@workspace/api-client-react";
 import { useProtectedRoute } from "@/hooks/use-protected-route";
-import { useLang } from "@/contexts/lang-context";
+import { localeForLanguage, localizedText, useLang, type ErpLang } from "@/contexts/lang-context";
 import { useApiFeedback } from "@/hooks/use-api-feedback";
 import { useConfirm } from "@/contexts/confirm-context";
 import { usePermissions } from "@/contexts/permissions-context";
@@ -236,7 +236,7 @@ export default function InventoryList() {
       <View style={styles.tabs}>
         {tabs.map((item) => (
           <Pressable key={item.key} onPress={() => { setTab(item.key); setSearch(""); }} style={[styles.tab, tab === item.key && styles.tabActive]} testID={`inventory-tab-${item.key}`}>
-            <Text style={[styles.tabText, tab === item.key && styles.tabTextActive]}>{lang === "ar" ? item.ar : item.fr}</Text>
+            <Text style={[styles.tabText, tab === item.key && styles.tabTextActive]}>{localizedText(lang, item.fr, item.ar)}</Text>
           </Pressable>
         ))}
       </View>
@@ -262,6 +262,7 @@ export default function InventoryList() {
           onRefresh={movementsQ.refetch}
           onOpen={(item) => item.productId ? router.push(`/products/${item.productId}` as never) : undefined}
           t={t}
+          lang={lang}
         />
       ) : null}
       {tab === "counts" ? (
@@ -272,6 +273,7 @@ export default function InventoryList() {
           onRefresh={countsQ.refetch}
           onOpen={(item) => { setSelectedCountId(item.id); setCountDrafts({}); }}
           t={t}
+          lang={lang}
         />
       ) : null}
 
@@ -387,6 +389,7 @@ function MovementList({
   onRefresh,
   onOpen,
   t,
+  lang,
 }: {
   data: InventoryMovement[];
   loading: boolean;
@@ -394,6 +397,7 @@ function MovementList({
   onRefresh: () => void;
   onOpen: (item: InventoryMovement) => void;
   t: (fr: string, ar: string) => string;
+  lang: ErpLang;
 }) {
   if (loading && !data.length) return <LoadingView />;
   if (!data.length) return <EmptyState title={t("Aucun mouvement de stock", "لا توجد حركات مخزون")} />;
@@ -407,7 +411,7 @@ function MovementList({
           </View>
           <Badge label={`${item.type} · ${item.quantity > 0 ? "+" : ""}${item.quantity}`} tone={TYPE_TONE[item.type] ?? "muted"} />
         </View>
-        <Text style={styles.dateText}>{formatDate(item.createdAt)}</Text>
+        <Text style={styles.dateText}>{formatDate(item.createdAt, lang)}</Text>
       </Pressable>
     )} />
   );
@@ -420,6 +424,7 @@ function CountList({
   onRefresh,
   onOpen,
   t,
+  lang,
 }: {
   data: InventoryCountSessionSummary[];
   loading: boolean;
@@ -427,6 +432,7 @@ function CountList({
   onRefresh: () => void;
   onOpen: (item: InventoryCountSessionSummary) => void;
   t: (fr: string, ar: string) => string;
+  lang: ErpLang;
 }) {
   if (loading && !data.length) return <LoadingView />;
   if (!data.length) return <EmptyState title={t("Aucune session de جرد", "لا توجد جلسات جرد")} subtitle={t("Démarrez une nouvelle session avec le bouton +.", "ابدأ جلسة جديدة من زر +.")} />;
@@ -436,7 +442,7 @@ function CountList({
         <View style={styles.rowTop}>
           <View style={styles.flex}>
             <Text style={styles.rowTitle}>{t("Session", "جلسة")} #{item.id}</Text>
-            <Text style={styles.rowSubtitle}>{item.createdByName ?? t("Utilisateur inconnu", "مستخدم غير معروف")} · {formatDate(item.createdAt)}</Text>
+            <Text style={styles.rowSubtitle}>{item.createdByName ?? t("Utilisateur inconnu", "مستخدم غير معروف")} · {formatDate(item.createdAt, lang)}</Text>
           </View>
           <Badge label={item.status === "open" ? t("Ouverte", "مفتوحة") : t("Clôturée", "مغلقة")} tone={item.status === "open" ? "warning" : "success"} />
         </View>
@@ -510,10 +516,10 @@ function ListContainer<T>({
   );
 }
 
-function formatDate(value?: string) {
+function formatDate(value: string | undefined, lang: ErpLang) {
   if (!value) return "—";
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString("fr-FR");
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString(localeForLanguage(lang));
 }
 
 const styles = StyleSheet.create({

@@ -1,15 +1,27 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { reloadAppAsync } from "expo";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { colors } from "@/lib/colors";
 import { Button } from "@/components/ui";
 
 function ErrorFallback({ onReload }: { onReload: () => void }) {
+  const [lang, setLang] = React.useState<"fr" | "ar" | "en">("fr");
+  React.useEffect(() => {
+    AsyncStorage.getItem("midanic_erp_lang").then((saved) => {
+      if (saved === "ar" || saved === "en" || saved === "fr") setLang(saved);
+    }).catch(() => {});
+  }, []);
+  const copy = {
+    fr: { title: "Une erreur inattendue est survenue", message: "Veuillez redémarrer l'application.", button: "Redémarrer" },
+    ar: { title: "حدث خطأ غير متوقع", message: "يرجى إعادة تشغيل التطبيق.", button: "إعادة التشغيل" },
+    en: { title: "An unexpected error occurred", message: "Please restart the app.", button: "Restart app" },
+  }[lang];
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>خطأ غير متوقع / Une erreur est survenue</Text>
-      <Text style={styles.subtitle}>Veuillez redémarrer l'application.</Text>
-      <Button label="Redémarrer / إعادة التشغيل" onPress={onReload} style={{ marginTop: 16, minWidth: 200 }} />
+      <Text style={styles.title}>{copy.title}</Text>
+      <Text style={styles.subtitle}>{copy.message}</Text>
+      <Button label={copy.button} onPress={onReload} style={{ marginTop: 16, minWidth: 200 }} />
     </View>
   );
 }

@@ -42,7 +42,7 @@ import {
   useGetProducts,
 } from "@workspace/api-client-react";
 import { useProtectedRoute } from "@/hooks/use-protected-route";
-import { useLang } from "@/contexts/lang-context";
+import { localeForLanguage, localizedText, useLang, type ErpLang } from "@/contexts/lang-context";
 import { useApiFeedback } from "@/hooks/use-api-feedback";
 import { useConfirm } from "@/contexts/confirm-context";
 import { Button, Card, EmptyState, FormField, LoadingView, Badge } from "@/components/ui";
@@ -349,7 +349,7 @@ export default function ProductsList() {
       }
       const result = typeof left === "number" && typeof right === "number"
         ? left - right
-        : String(left).localeCompare(String(right), lang === "ar" ? "ar" : "fr");
+        : String(left).localeCompare(String(right), lang === "ar" ? "ar" : lang === "en" ? "en" : "fr");
       return sortDescending ? -result : result;
     });
     return sorted;
@@ -488,7 +488,7 @@ export default function ProductsList() {
       return;
     }
     void Share.share({
-      message: message || t(`Articles: ${total} produit(s)`, `المقالات: ${total} منتج`),
+      message: message || t(`Articles: ${total} produit(s)`, `المقالات: ${total} منتج`, `Items: ${total} product(s)`),
     });
   }
 
@@ -635,7 +635,7 @@ export default function ProductsList() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll} contentContainerStyle={styles.tabsContent}>
         {tabs.map((item) => (
           <Pressable key={item.key} onPress={() => setTab(item.key)} style={[styles.tab, tab === item.key && styles.tabActive]}>
-            <Text style={[styles.tabText, tab === item.key && styles.tabTextActive]}>{lang === "ar" ? item.ar : item.fr}</Text>
+            <Text style={[styles.tabText, tab === item.key && styles.tabTextActive]}>{localizedText(lang, item.fr, item.ar)}</Text>
           </Pressable>
         ))}
       </ScrollView>
@@ -790,7 +790,7 @@ export default function ProductsList() {
           value={families.find((family) => family.nameFr.toLowerCase() === draftFilters.filterFamily.toLowerCase()) ?? null}
           items={families}
           keyExtractor={(family) => String(family.id)}
-          labelExtractor={(family) => lang === "ar" ? family.nameAr : family.nameFr}
+          labelExtractor={(family) => localizedText(lang, family.nameFr, family.nameAr)}
           onChange={(family) => setDraftFilters((current) => ({ ...current, filterFamily: family.nameFr }))}
           placeholder={t("Saisir ou choisir une famille", "اكتب أو اختر عائلة")}
         />
@@ -799,7 +799,7 @@ export default function ProductsList() {
           value={brands.find((brand) => brand.nameFr.toLowerCase() === draftFilters.filterBrand.toLowerCase()) ?? null}
           items={brands}
           keyExtractor={(brand) => String(brand.id)}
-          labelExtractor={(brand) => lang === "ar" ? brand.nameAr : brand.nameFr}
+          labelExtractor={(brand) => localizedText(lang, brand.nameFr, brand.nameAr)}
           onChange={(brand) => setDraftFilters((current) => ({ ...current, filterBrand: brand.nameFr }))}
           placeholder={t("Saisir ou choisir une marque", "اكتب أو اختر ماركة")}
         />
@@ -808,7 +808,7 @@ export default function ProductsList() {
           value={productColors.find((color) => color.nameFr.toLowerCase() === draftFilters.filterColor.toLowerCase()) ?? null}
           items={productColors}
           keyExtractor={(color) => String(color.id)}
-          labelExtractor={(color) => lang === "ar" ? color.nameAr : color.nameFr}
+          labelExtractor={(color) => localizedText(lang, color.nameFr, color.nameAr)}
           onChange={(color) => setDraftFilters((current) => ({ ...current, filterColor: color.nameFr }))}
           placeholder={t("Saisir ou choisir une couleur", "اكتب أو اختر لونًا")}
         />
@@ -817,7 +817,7 @@ export default function ProductsList() {
           value={productTypes.find((type) => type.nameFr.toLowerCase() === draftFilters.filterCatalogueType.toLowerCase()) ?? null}
           items={productTypes}
           keyExtractor={(type) => String(type.id)}
-          labelExtractor={(type) => lang === "ar" ? type.nameAr : type.nameFr}
+          labelExtractor={(type) => localizedText(lang, type.nameFr, type.nameAr)}
           onChange={(type) => setDraftFilters((current) => ({ ...current, filterCatalogueType: type.nameFr }))}
           placeholder={t("Tous les types", "كل الأنواع")}
         />
@@ -939,7 +939,7 @@ function ArticleTable({
   products: Product[];
   families: ProductFamily[];
   columns: ArticleColumnKey[];
-  lang: string;
+  lang: ErpLang;
   isRefreshing: boolean;
   isFetching: boolean;
   onRefresh: () => void;
@@ -988,7 +988,7 @@ function ArticleTable({
                   <TextInput
                     value={String(filterValues[column.filterKey] ?? "")}
                     onChangeText={(value) => onFilterChange(column.filterKey!, value)}
-                    placeholder="abc  Filtre ..."
+                    placeholder={`abc  ${localizedText(lang, "Filtre ...", "تصفية ...")}`}
                     placeholderTextColor={colors.textMuted}
                     style={styles.tableFilterInput}
                     autoCapitalize="none"
@@ -999,7 +999,7 @@ function ArticleTable({
                   />
                 ) : column.key === "actions" || column.key === "image" ? null : (
                   <Pressable onPress={onOpenFilters} style={styles.tableFilterTrigger} testID={`button-column-filter-${column.key}`}>
-                    <Text style={styles.tableFilterText}>abc&nbsp; Filtre ...</Text>
+                    <Text style={styles.tableFilterText}>abc&nbsp; {localizedText(lang, "Filtre ...", "تصفية ...")}</Text>
                   </Pressable>
                 )}
               </View>
@@ -1008,7 +1008,7 @@ function ArticleTable({
         {isFetching ? (
           <View style={styles.tableFetching}>
             <ActivityIndicator size="small" color={colors.primary} />
-            <Text style={styles.refreshText}>{lang === "ar" ? "جارٍ التحديث..." : "Mise à jour..."}</Text>
+            <Text style={styles.refreshText}>{localizedText(lang, "Mise à jour...", "جارٍ التحديث...")}</Text>
           </View>
         ) : null}
         <FlatList
@@ -1058,7 +1058,7 @@ function MobileProductList({
   emptySubtitle,
 }: {
   products: Product[];
-  lang: string;
+  lang: ErpLang;
   currency: string;
   isRefreshing: boolean;
   onRefresh: () => void;
@@ -1115,7 +1115,7 @@ function ArticleTableRow({
   product: Product;
   families: ProductFamily[];
   columns: Array<{ key: ArticleColumnKey; label: string; width: number }>;
-  lang: string;
+  lang: ErpLang;
   onOpen: () => void;
   onActions: () => void;
   selected: boolean;
@@ -1143,11 +1143,11 @@ function ArticleTableRow({
   );
 }
 
-function TableCellValue({ product, families, column, lang }: { product: Product; families: ProductFamily[]; column: ArticleColumnKey; lang: string }) {
+function TableCellValue({ product, families, column, lang }: { product: Product; families: ProductFamily[]; column: ArticleColumnKey; lang: ErpLang }) {
   const value = tableValue(product, column, lang, families);
   if (column === "isExposed") {
     return (
-      <Badge label={product.isExposed ? "Oui" : "Non"} tone={product.isExposed ? "info" : "muted"} />
+      <Badge label={product.isExposed ? localizedText(lang, "Oui", "نعم") : localizedText(lang, "Non", "لا")} tone={product.isExposed ? "info" : "muted"} />
     );
   }
   if (column === "isActive") {
@@ -1183,7 +1183,7 @@ function TableCellValue({ product, families, column, lang }: { product: Product;
   return <Text style={styles.tableCellText} numberOfLines={1}>{value}</Text>;
 }
 
-function tableValue(product: Product, column: ArticleColumnKey, lang: string, families: ProductFamily[] = []): string {
+function tableValue(product: Product, column: ArticleColumnKey, lang: ErpLang, families: ProductFamily[] = []): string {
   switch (column) {
     case "id": return String(product.id);
     case "name": return lang === "ar" ? product.nameAr : product.nameEn;
@@ -1191,8 +1191,8 @@ function tableValue(product: Product, column: ArticleColumnKey, lang: string, fa
     case "barcode": return product.barcode ?? "—";
     case "reference": return product.reference ?? "—";
     case "catalogueType": return product.catalogueType ?? "—";
-    case "createdAt": return product.createdAt ? new Date(product.createdAt).toLocaleDateString(lang === "ar" ? "ar-DZ" : "fr-FR") : "—";
-    case "isActive": return product.isActive === false ? "Inactif" : "Actif";
+    case "createdAt": return product.createdAt ? new Date(product.createdAt).toLocaleDateString(localeForLanguage(lang)) : "—";
+    case "isActive": return product.isActive === false ? localizedText(lang, "Inactif", "غير نشط") : localizedText(lang, "Actif", "نشط");
     case "price": return formatArticleMoney(product.price, lang);
     case "priceGros": return formatArticleMoney(product.priceGros, lang);
     case "priceSemiGros": return formatArticleMoney(product.priceSemiGros, lang);
@@ -1205,7 +1205,7 @@ function tableValue(product: Product, column: ArticleColumnKey, lang: string, fa
     case "family": {
       if (!product.familyId) return "—";
       const family = families.find((item) => item.id === product.familyId);
-      return family ? (lang === "ar" ? family.nameAr : family.nameFr) : `#${product.familyId}`;
+      return family ? localizedText(lang, family.nameFr, family.nameAr) : `#${product.familyId}`;
     }
     case "colisage": return product.colisage == null ? "—" : String(product.colisage);
     case "weight": return product.weight ?? "—";
@@ -1215,19 +1215,19 @@ function tableValue(product: Product, column: ArticleColumnKey, lang: string, fa
     case "catalogue4": return product.catalogue4 ?? "—";
     case "catalogue5": return product.catalogue5 ?? "—";
     case "catalogue6": return product.catalogue6 ?? "—";
-    case "isExposed": return product.isExposed ? "Oui" : "Non";
-    case "vitrine": return product.isExposed ? "Oui" : "Non";
+    case "isExposed": return product.isExposed ? localizedText(lang, "Oui", "نعم") : localizedText(lang, "Non", "لا");
+    case "vitrine": return product.isExposed ? localizedText(lang, "Oui", "نعم") : localizedText(lang, "Non", "لا");
     case "actions":
     case "image":
     default: return lang === "ar" ? product.nameAr : product.nameEn;
   }
 }
 
-function formatArticleMoney(value: string | null | undefined, lang: string) {
+function formatArticleMoney(value: string | null | undefined, lang: ErpLang) {
   if (value == null || value === "") return "—";
   const amount = Number(String(value).replace(",", "."));
   if (!Number.isFinite(amount)) return String(value);
-  const formatted = amount.toLocaleString(lang === "ar" ? "ar-DZ" : "fr-FR", {
+  const formatted = amount.toLocaleString(localeForLanguage(lang), {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
@@ -1336,7 +1336,7 @@ function ProductDetailsSheet({
   historyError: boolean;
   historyAllowed: boolean;
   tab: DetailTab;
-  lang: string;
+  lang: ErpLang;
   currency: string;
   onTabChange: (tab: DetailTab) => void;
   onClose: () => void;
@@ -1372,7 +1372,7 @@ function ProductDetailsSheet({
   );
 }
 
-function ProductInformation({ product, families, currency, t, lang }: { product: Product; families: ProductFamily[]; currency: string; t: (fr: string, ar: string) => string; lang: string }) {
+function ProductInformation({ product, families, currency, t, lang }: { product: Product; families: ProductFamily[]; currency: string; t: (fr: string, ar: string) => string; lang: ErpLang }) {
   const family = product.familyId ? families.find((item) => item.id === product.familyId) : null;
   const fields: Array<[string, string]> = [
     [t("Nom (arabe)", "الاسم بالعربية"), product.nameAr],
@@ -1387,7 +1387,7 @@ function ProductInformation({ product, families, currency, t, lang }: { product:
     [t("Prix en gros", "سعر الجملة"), product.priceGros ? `${formatAmount(product.priceGros)} ${currency}` : "—"],
     [t("Modèle", "الموديل"), product.model ?? "—"],
     [t("Couleur", "اللون"), product.color ?? "—"],
-    [t("Famille", "العائلة"), family ? (lang === "ar" ? family.nameAr : family.nameFr) : product.familyId ? `#${product.familyId}` : "—"],
+    [t("Famille", "العائلة"), family ? localizedText(lang, family.nameFr, family.nameAr) : product.familyId ? `#${product.familyId}` : "—"],
     [t("Colisage", "التعبئة"), product.colisage == null ? "—" : String(product.colisage)],
     [t("Poids", "الوزن"), product.weight ?? "—"],
   ];
@@ -1446,7 +1446,7 @@ function SalesHistory({ history, loading, currency, t }: { history?: ProductHist
   );
 }
 
-function MovementHistory({ history, loading, lang, t }: { history?: ProductHistoryResponse; loading: boolean; lang: string; t: (fr: string, ar: string) => string }) {
+function MovementHistory({ history, loading, lang, t }: { history?: ProductHistoryResponse; loading: boolean; lang: ErpLang; t: (fr: string, ar: string) => string }) {
   if (loading) return <LoadingView label={t("Chargement de l'historique...", "جارٍ تحميل السجل...")} />;
   const entries = history?.timeline ?? [];
   const customerReturns = history?.returns ?? [];
@@ -1491,7 +1491,7 @@ function ArticleCard({
   onActions,
 }: {
   product: Product;
-  lang: string;
+  lang: ErpLang;
   currency: string;
   compact: boolean;
   canEdit: boolean;
@@ -1530,9 +1530,9 @@ function ArticleCard({
       </View>
 
       <View style={styles.metrics}>
-        <Metric label="STOCK" value={String(stock)} tone={statusTone} />
-        <Metric label="PRIX VENTE" value={`${Number(product.price ?? 0).toLocaleString("fr-FR")} ${currency}`} />
-        <Metric label="PRIX GROS" value={product.priceGros ? `${Number(product.priceGros).toLocaleString("fr-FR")} ${currency}` : "—"} />
+        <Metric label={localizedText(lang, "STOCK", "المخزون")} value={String(stock)} tone={statusTone} />
+        <Metric label={localizedText(lang, "PRIX VENTE", "سعر البيع")} value={`${Number(product.price ?? 0).toLocaleString("fr-FR")} ${currency}`} />
+        <Metric label={localizedText(lang, "PRIX GROS", "سعر الجملة")} value={product.priceGros ? `${Number(product.priceGros).toLocaleString("fr-FR")} ${currency}` : "—"} />
       </View>
 
       {!compact ? (

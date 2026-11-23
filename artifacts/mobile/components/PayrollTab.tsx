@@ -17,7 +17,7 @@ import {
   getGetPayslipsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useLang } from "@/contexts/lang-context";
+import { localeForLanguage, useLang, type ErpLang } from "@/contexts/lang-context";
 import { useApiFeedback } from "@/hooks/use-api-feedback";
 import { Screen } from "@/components/Screen";
 import { Card, Button, FormField, SectionTitle, Divider } from "@/components/ui";
@@ -47,11 +47,11 @@ function formatAmount(value: string | number | null | undefined, currency: strin
   return `${Number(value ?? 0).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
 }
 
-function formatDate(value: string | null | undefined, lang: "fr" | "ar") {
+function formatDate(value: string | null | undefined, lang: ErpLang) {
   if (!value) return "—";
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleDateString(lang === "ar" ? "ar-DZ" : "fr-FR");
+  return parsed.toLocaleDateString(localeForLanguage(lang));
 }
 
 export default function PayrollTab({
@@ -214,7 +214,7 @@ export default function PayrollTab({
           </View>
         </View>
         <Button
-          label={t(`Générer (${employees.filter((e) => e.status === "active").length} employés)`, `إنشاء (${employees.filter((e) => e.status === "active").length} موظفين)`)}
+          label={t(`Générer (${employees.filter((e) => e.status === "active").length} employés)`, `إنشاء (${employees.filter((e) => e.status === "active").length} موظفين)`, `Generate (${employees.filter((e) => e.status === "active").length} employees)`)}
           onPress={submitPayroll}
           loading={generatePayroll.isPending}
           disabled={!canCreate || employees.filter((e) => e.status === "active").length === 0}

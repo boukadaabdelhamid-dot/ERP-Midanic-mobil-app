@@ -15,7 +15,7 @@ export default function RetoursList() {
   const router = useRouter();
   const currency = lang === "ar" ? "دج" : "DA";
 
-  const { data, isLoading, refetch, isRefetching } = useGetAdminRetours({
+  const { data, isLoading, refetch, isRefetching } = useGetAdminRetours(undefined, {
     query: { enabled: ready, queryKey: getGetAdminRetoursQueryKey() },
   });
 

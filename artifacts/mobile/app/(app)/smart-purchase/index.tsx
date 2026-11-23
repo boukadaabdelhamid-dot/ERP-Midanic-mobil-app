@@ -14,7 +14,7 @@ import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import { useProtectedRoute } from "@/hooks/use-protected-route";
-import { useLang } from "@/contexts/lang-context";
+import { localeForLanguage, localizedText, useLang } from "@/contexts/lang-context";
 import { useStoreContext } from "@/contexts/store-context";
 import { useApiFeedback } from "@/hooks/use-api-feedback";
 import { useConfirm } from "@/contexts/confirm-context";
@@ -93,12 +93,13 @@ function getDateRange(preset: DatePreset) {
 // ─── StockBar ─────────────────────────────────────────────────────────────────
 
 function StockBar({ stock, minStock }: { stock: number; minStock: number | null }) {
+  const { t } = useLang();
   const isRupture = stock === 0;
   if (minStock == null || minStock <= 0) {
     return (
       <View style={sb.row}>
         <Text style={[sb.qty, isRupture && sb.red]}>{stock}</Text>
-        {isRupture && <View style={sb.badge}><Text style={sb.badgeText}>RUPTURE</Text></View>}
+        {isRupture && <View style={sb.badge}><Text style={sb.badgeText}>{t("RUPTURE", "نفد المخزون")}</Text></View>}
       </View>
     );
   }
@@ -188,7 +189,7 @@ const ms = StyleSheet.create({
 // ─── HistorySheet ─────────────────────────────────────────────────────────────
 
 function HistorySheet({ product, onClose }: { product: NeededRow | null; onClose: () => void }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const { data, isLoading } = usePurchaseHistory(product?.id ?? null, product != null);
 
   return (
@@ -223,7 +224,7 @@ function HistorySheet({ product, onClose }: { product: NeededRow | null; onClose
               <View key={`${row.po_id}-${i}`} style={sh.histCard}>
                 <View style={sh.histTop}>
                   <Text style={sh.histDate}>
-                    {new Date(row.received_date).toLocaleDateString("fr-DZ")}
+                    {new Date(row.received_date).toLocaleDateString(localeForLanguage(lang))}
                   </Text>
                   <Text style={sh.histRef}>#{String(row.po_id).padStart(6, "0")}</Text>
                 </View>
@@ -855,9 +856,9 @@ function FilterModal({
                     <Text style={[fm.pillTxt, !local.familyId && fm.pillTxtOn]}>{t("Tout", "الكل")}</Text>
                   </Pressable>
                   {opts.families.map((f) => (
-                    <Pressable key={f.id} onPress={() => setLocal((p) => ({ ...p, familyId: f.id, familyName: lang === "ar" ? f.nameAr : f.nameFr }))}
+                    <Pressable key={f.id} onPress={() => setLocal((p) => ({ ...p, familyId: f.id, familyName: localizedText(lang, f.nameFr, f.nameAr) }))}
                       style={[fm.pill, local.familyId === f.id && fm.pillOn]}>
-                      <Text style={[fm.pillTxt, local.familyId === f.id && fm.pillTxtOn]}>{lang === "ar" ? f.nameAr : f.nameFr}</Text>
+                      <Text style={[fm.pillTxt, local.familyId === f.id && fm.pillTxtOn]}>{localizedText(lang, f.nameFr, f.nameAr)}</Text>
                     </Pressable>
                   ))}
                 </ScrollView>
@@ -874,9 +875,9 @@ function FilterModal({
                     <Text style={[fm.pillTxt, !local.brandId && fm.pillTxtOn]}>{t("Tout", "الكل")}</Text>
                   </Pressable>
                   {opts.brands.map((b) => (
-                    <Pressable key={b.id} onPress={() => setLocal((p) => ({ ...p, brandId: b.id, brandName: lang === "ar" ? b.nameAr : b.nameFr }))}
+                    <Pressable key={b.id} onPress={() => setLocal((p) => ({ ...p, brandId: b.id, brandName: localizedText(lang, b.nameFr, b.nameAr) }))}
                       style={[fm.pill, local.brandId === b.id && fm.pillOn]}>
-                      <Text style={[fm.pillTxt, local.brandId === b.id && fm.pillTxtOn]}>{lang === "ar" ? b.nameAr : b.nameFr}</Text>
+                      <Text style={[fm.pillTxt, local.brandId === b.id && fm.pillTxtOn]}>{localizedText(lang, b.nameFr, b.nameAr)}</Text>
                     </Pressable>
                   ))}
                 </ScrollView>
@@ -930,7 +931,7 @@ function FilterModal({
               ] as { key: DatePreset; fr: string; ar: string }[]).map(({ key, fr, ar }) => (
                 <Pressable key={key} onPress={() => applyDatePreset(key)}
                   style={[fm.pill, local.datePreset === key && fm.pillOn]}>
-                  <Text style={[fm.pillTxt, local.datePreset === key && fm.pillTxtOn]}>{lang === "ar" ? ar : fr}</Text>
+                  <Text style={[fm.pillTxt, local.datePreset === key && fm.pillTxtOn]}>{localizedText(lang, fr, ar)}</Text>
                 </Pressable>
               ))}
               {local.datePreset ? (
@@ -1132,7 +1133,7 @@ function ProductCard({
                   <View style={pc.supplierMeta}>
                     <Feather name="calendar" size={11} color={colors.textMuted} />
                     <Text style={[pc.supplierMetaText, compact && pc.supplierMetaCompact]}>
-                      {t("Dernier achat", "آخر شراء")}: {new Date(supplier.last_purchase_date).toLocaleDateString(lang === "ar" ? "ar-DZ" : "fr-DZ")}
+                      {t("Dernier achat", "آخر شراء")}: {new Date(supplier.last_purchase_date).toLocaleDateString(localeForLanguage(lang))}
                     </Text>
                   </View>
                 ) : null}
@@ -1169,7 +1170,7 @@ function ProductCard({
                       <View style={pc.supplierMeta}>
                         <Feather name="clock" size={11} color={colors.textMuted} />
                         <Text style={[pc.supplierMetaText, compact && pc.supplierMetaCompact]}>
-                          {t("Position relevée", "وقت التقاط الموقع")}: {gpsCapturedAt.toLocaleString(lang === "ar" ? "ar-DZ" : "fr-DZ")}
+                          {t("Position relevée", "وقت التقاط الموقع")}: {gpsCapturedAt.toLocaleString(localeForLanguage(lang))}
                         </Text>
                       </View>
                     ) : null}
@@ -1271,8 +1272,8 @@ function SuggestionCard({
   onTap: () => void; onCommander: () => void;
   tapping: boolean;
 }) {
-  const { t } = useLang();
-  const date = new Date(item.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" });
+  const { t, lang } = useLang();
+  const date = new Date(item.created_at).toLocaleDateString(localeForLanguage(lang), { day: "2-digit", month: "short" });
 
   return (
     <View style={sc.card}>
@@ -1517,7 +1518,8 @@ export default function SmartPurchase() {
     confirm({
       title: t("Exclure définitivement ?", "استثناء دائم؟"),
       message: t(`Exclure "${row.designation}" ? Il ne réapparaîtra plus jamais.`,
-        `استثناء "${row.designation_ar || row.designation}" نهائياً؟`),
+        `استثناء "${row.designation_ar || row.designation}" نهائياً؟`,
+        `Exclude "${row.designation}"? It will never appear again.`),
       confirmLabel: t("Exclure", "استثناء"),
       destructive: true,
     }).then((ok) => {
@@ -1566,6 +1568,7 @@ export default function SmartPurchase() {
       message: t(
         `Besoin d'achat — ${productsCount} produit(s) à acheter`,
         `احتياجات الشراء — ${productsCount} منتج`,
+        `Purchase needs — ${productsCount} product(s) to buy`,
       ),
     });
   }
@@ -1840,7 +1843,7 @@ export default function SmartPurchase() {
                   onDelete={() =>
                     confirm({
                       title: t("Supprimer l'idée ?", "حذف الاقتراح؟"),
-                      message: t(`Supprimer "${item.product_name}" ?`, `حذف "${item.product_name}"؟`),
+                      message: t(`Supprimer "${item.product_name}" ?`, `حذف "${item.product_name}"؟`, `Delete "${item.product_name}"?`),
                       confirmLabel: t("Supprimer", "حذف"),
                       destructive: true,
                     }).then((ok) => {

@@ -5,21 +5,19 @@ import {
   useGetPurchaseOrders,
   useGetPurchaseOrderItems,
   useUpdatePurchaseOrder,
-  useGetSuppliers,
   useGetProducts,
   getGetPurchaseOrdersQueryKey,
   getGetPurchaseOrderItemsQueryKey,
-  getGetSuppliersQueryKey,
   getGetProductsQueryKey,
-  type Supplier,
   type Product,
 } from "@workspace/api-client-react";
 import { useProtectedRoute } from "@/hooks/use-protected-route";
 import { useLang } from "@/contexts/lang-context";
 import { useApiFeedback } from "@/hooks/use-api-feedback";
 import { Screen } from "@/components/Screen";
-import { LoadingView, ErrorState } from "@/components/ui";
+import { LoadingView, ErrorState, Button } from "@/components/ui";
 import { PurchaseOrderForm, emptyPurchaseOrderForm, type PurchaseOrderFormValues } from "@/components/PurchaseOrderForm";
+import { useSuppliersAll } from "@/hooks/use-smart-purchase";
 
 export default function EditPurchaseOrder() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -39,10 +37,13 @@ export default function EditPurchaseOrder() {
     query: { enabled: ready && !!poId, queryKey: getGetPurchaseOrderItemsQueryKey(poId) },
   });
 
-  const { data: suppliersData, isSuccess: suppliersLoaded } = useGetSuppliers({
-    query: { enabled: ready, queryKey: getGetSuppliersQueryKey() },
-  });
-  const suppliers = ((suppliersData as unknown as { data?: Supplier[] })?.data ?? []) as Supplier[];
+  const {
+    data: suppliersData,
+    isSuccess: suppliersLoaded,
+    isError: suppliersFailed,
+    refetch: reloadSuppliers,
+  } = useSuppliersAll(ready);
+  const suppliers = suppliersData ?? [];
 
   const productsParams = { limit: 500 };
   const { data: productsData, isSuccess: productsLoaded } = useGetProducts(productsParams, {
@@ -82,6 +83,21 @@ export default function EditPurchaseOrder() {
   const canEdit = isAdmin || can("purchases", "edit");
   if (!canEdit) {
     return <ErrorState title={t("Action non autorisée", "غير مسموح بهذا الإجراء")} />;
+  }
+  if (suppliersFailed && !suppliersData) {
+    return (
+      <Screen>
+        <ErrorState
+          title={t("Impossible de charger les fournisseurs", "تعذر تحميل الموردين")}
+          subtitle={t("Vérifiez la connexion puis réessayez.", "تحقق من الاتصال ثم أعد المحاولة.")}
+        />
+        <Button
+          label={t("Réessayer", "إعادة المحاولة")}
+          onPress={() => { void reloadSuppliers(); }}
+          testID="button-retry-edit-order-suppliers"
+        />
+      </Screen>
+    );
   }
   if (listLoading || itemsLoading || !hydrated) return <LoadingView />;
   if (!po) return <ErrorState title={t("Bon d'achat introuvable", "أمر الشراء غير موجود")} />;

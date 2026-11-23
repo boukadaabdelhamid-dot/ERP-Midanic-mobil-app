@@ -93,7 +93,7 @@ export default function EditStaffPermissions() {
           {member?.role ? (
             <Badge label={member.role === "admin" ? t("Administrateur", "مدير") : t("Employé", "موظف")} tone={member.role === "admin" ? "info" : "muted"} />
           ) : null}
-          <Text style={styles.count}>{t(`${granted}/${total} accordées`, `${granted}/${total} ممنوحة`)}</Text>
+          <Text style={styles.count}>{t(`${granted}/${total} accordées`, `${granted}/${total} ممنوحة`, `${granted}/${total} granted`)}</Text>
         </View>
         {member?.role === "admin" ? (
           <Text style={styles.hint}>

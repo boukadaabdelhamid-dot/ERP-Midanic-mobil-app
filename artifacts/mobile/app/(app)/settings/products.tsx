@@ -25,7 +25,7 @@ import {
   getGetErpSettingsProductsTypesQueryKey,
 } from "@workspace/api-client-react";
 import { useProtectedRoute } from "@/hooks/use-protected-route";
-import { useLang } from "@/contexts/lang-context";
+import { localizedText, useLang } from "@/contexts/lang-context";
 import { useApiFeedback } from "@/hooks/use-api-feedback";
 import { useConfirm } from "@/contexts/confirm-context";
 import { Screen } from "@/components/Screen";
@@ -118,7 +118,7 @@ function TaxonomySection({
           <View key={item.id} style={[styles.row, i > 0 && styles.rowBorder]}>
             {withColor && item.hexCode ? <View style={[styles.swatch, { backgroundColor: item.hexCode }]} /> : null}
             <Text style={styles.rowLabel} numberOfLines={1}>
-              {lang === "ar" ? item.nameAr : item.nameFr}
+              {localizedText(lang, item.nameFr, item.nameAr)}
             </Text>
             {canWrite ? (
               <View style={styles.rowActions}>

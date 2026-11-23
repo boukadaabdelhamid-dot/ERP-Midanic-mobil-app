@@ -16,7 +16,7 @@ import {
   type CaisseMovement,
 } from "@workspace/api-client-react";
 import { useProtectedRoute } from "@/hooks/use-protected-route";
-import { useLang } from "@/contexts/lang-context";
+import { localeForLanguage, useLang } from "@/contexts/lang-context";
 import { useMe } from "@/hooks/use-me";
 import { useApiFeedback } from "@/hooks/use-api-feedback";
 import { Screen } from "@/components/Screen";
@@ -207,7 +207,7 @@ export default function CaisseDetail() {
             <View style={styles.row}>
               <Badge label={t("Ouverte", "مفتوحة")} tone="success" />
               <Text style={styles.mutedSmall}>
-                {t("Depuis", "منذ")} {new Date(activeSession.openedAt).toLocaleString("fr-FR")}
+                {t("Depuis", "منذ")} {new Date(activeSession.openedAt).toLocaleString(localeForLanguage(lang))}
               </Text>
             </View>
             <Divider />
@@ -295,7 +295,7 @@ export default function CaisseDetail() {
                 <View style={styles.row}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.movReason}>{t(fr, ar)}</Text>
-                    <Text style={styles.mutedSmall}>{new Date(m.createdAt).toLocaleString("fr-FR")}</Text>
+                    <Text style={styles.mutedSmall}>{new Date(m.createdAt).toLocaleString(localeForLanguage(lang))}</Text>
                     {m.notes ? <Text style={styles.mutedSmall}>{m.notes}</Text> : null}
                   </View>
                   <Text style={[styles.movAmount, { color: m.type === "credit" ? colors.success : colors.danger }]}>
