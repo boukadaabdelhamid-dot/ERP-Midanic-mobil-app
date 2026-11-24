@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
   getAdminRetoursQueryKey,
@@ -9,6 +10,15 @@ import {
   getCustomerDetailUrl,
 } from "../../../lib/erp-api-client-react/src/customer-detail-query.ts";
 import { parseContactMoneyAmount } from "../lib/contact-money-operation.ts";
+
+const supplierPaymentSource = readFileSync(
+  new URL("../app/(app)/suppliers/[id]/payment.tsx", import.meta.url),
+  "utf8",
+);
+const customerRefundSource = readFileSync(
+  new URL("../app/(app)/customers/[id]/refund.tsx", import.meta.url),
+  "utf8",
+);
 
 test("customer details request only that customer's returns", () => {
   const params = { clientUserId: 42, limit: 20 };
@@ -42,4 +52,20 @@ test("contact money amounts reject invalid, nonpositive, or over-precise values"
   assert.equal(parseContactMoneyAmount("-10"), null);
   assert.equal(parseContactMoneyAmount("12.345"), null);
   assert.equal(parseContactMoneyAmount("abc"), null);
+});
+
+test("supplier payment form resets for another supplier and unlocks after saving", () => {
+  assert.match(supplierPaymentSource, /key=\{\`\$\{supplierId\}-\$\{formSession\}\`\}/);
+  assert.match(
+    supplierPaymentSource,
+    /onSuccess: \(\) => \{\s*submitLocked\.current = false;\s*setFormSession\(\(session\) => session \+ 1\);/,
+  );
+});
+
+test("customer refund form also resets after a successful operation", () => {
+  assert.match(customerRefundSource, /key=\{\`\$\{customerId\}-\$\{formSession\}\`\}/);
+  assert.match(
+    customerRefundSource,
+    /onSuccess: \(\) => \{\s*submitLocked\.current = false;\s*setFormSession\(\(session\) => session \+ 1\);/,
+  );
 });

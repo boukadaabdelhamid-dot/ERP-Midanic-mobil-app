@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -23,6 +23,7 @@ export default function SupplierPayment() {
   const feedback = useApiFeedback();
   const mutation = useCreateSupplierOperation();
   const submitLocked = useRef(false);
+  const [formSession, setFormSession] = useState(0);
 
   if (!ready) return null;
   if (!Number.isInteger(supplierId) || supplierId < 1) {
@@ -48,6 +49,8 @@ export default function SupplierPayment() {
       },
       {
         onSuccess: () => {
+          submitLocked.current = false;
+          setFormSession((session) => session + 1);
           feedback.success("Paiement enregistré", "تم تسجيل دفعة المورد");
           void queryClient.invalidateQueries({ queryKey: getGetSupplierOperationsQueryKey(supplierId) });
           void queryClient.invalidateQueries({ queryKey: getGetSuppliersQueryKey() });
@@ -64,6 +67,7 @@ export default function SupplierPayment() {
 
   return (
     <ContactMoneyOperationForm
+      key={`${supplierId}-${formSession}`}
       title={t("Nouveau paiement fournisseur", "دفعة جديدة للمورد")}
       submitLabel={t("Enregistrer le paiement", "تسجيل الدفعة")}
       caisseHint={t("Le montant sera débité de votre caisse personnelle.", "سيُخصم المبلغ من صندوقك الشخصي.")}

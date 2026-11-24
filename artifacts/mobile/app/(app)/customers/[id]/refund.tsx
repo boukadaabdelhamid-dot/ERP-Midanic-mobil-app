@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -24,6 +24,7 @@ export default function CustomerRefund() {
   const feedback = useApiFeedback();
   const mutation = useCreateCustomerOperation();
   const submitLocked = useRef(false);
+  const [formSession, setFormSession] = useState(0);
 
   if (!ready) return null;
   if (!Number.isInteger(customerId) || customerId < 1) {
@@ -49,6 +50,8 @@ export default function CustomerRefund() {
       },
       {
         onSuccess: () => {
+          submitLocked.current = false;
+          setFormSession((session) => session + 1);
           feedback.success("Remboursement enregistré", "تم تسجيل استرداد المبلغ للزبون");
           void queryClient.invalidateQueries({ queryKey: getGetCustomerOperationsQueryKey(customerId) });
           void queryClient.invalidateQueries({ queryKey: getGetErpCustomerQueryKey(customerId) });
@@ -66,6 +69,7 @@ export default function CustomerRefund() {
 
   return (
     <ContactMoneyOperationForm
+      key={`${customerId}-${formSession}`}
       title={t("Rembourser le client", "استرداد مبلغ للزبون")}
       submitLabel={t("Enregistrer le remboursement", "تسجيل الاسترداد")}
       caisseHint={t("Le montant sera débité de votre caisse personnelle.", "سيُخصم المبلغ من صندوقك الشخصي.")}
